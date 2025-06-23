@@ -23,3 +23,10 @@ Graphics Programming midterm project
 - Added four static Matter.js wall bodies to enclose the play area and prevent ball escape.
 - All walls and pocket markers are visually overlaid for easy alignment and debugging.
 - Project is now ready for adding the ball system and dynamic gameplay!
+
+## Commit 4: Ball Formation & Cue Ball Drag
+
+- Implemented the official English eight-ball “J” rack: correct corner colors, stripes, and black ball always centered.
+- Ball color assignments are randomized each game (within formation rules).
+- Added interactive cue ball drag-and-drop before break, constrained to the D area, with visual highlight while dragging.
+- Improved code clarity, rack layout logic, and added explanatory comments.
