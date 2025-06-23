@@ -1,10 +1,17 @@
 # Pool-Game
 Graphics Programming midterm project
 
-Commit 1: Kick-off & Toolchain stage:
+## Commit 1: Kick-off & Toolchain stage:
 
 > Initialized Pool Game project structure with essential files: index.html, sketch.js, style.css, and README.md.
 > Integrated p5.js (rendering) and Matter.js (physics) via CDN links in index.html.
 > Created static 800x400 canvas and minimal draw loop for future game development.
 > Verified project loads with green background and displays frame rate.
 > Confirmed working setup in both VS Code and Brackets environments.
+
+## Commit 2: Core Engine Setup
+
+- Configures Matter.js physics engine for stable, gravity-free 2D simulation.
+- Sets static canvas size using constants for future refactoring.
+- Debug prints for engine state on launch.
+- Ready to add table boundaries and dynamic entities next.
