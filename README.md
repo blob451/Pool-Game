@@ -15,3 +15,11 @@ Graphics Programming midterm project
 - Sets static canvas size using constants for future refactoring.
 - Debug prints for engine state on launch.
 - Ready to add table boundaries and dynamic entities next.
+
+## Commit 3: Table & Boundaries
+
+- Expanded canvas size to 1300x800 for a larger, more realistic pool table background and extra UI space.
+- Rendered a detailed visual table: green felt, wood border, and six marked pocket locations.
+- Added four static Matter.js wall bodies to enclose the play area and prevent ball escape.
+- All walls and pocket markers are visually overlaid for easy alignment and debugging.
+- Project is now ready for adding the ball system and dynamic gameplay!
