@@ -1,4 +1,4 @@
-// Ball System: J-Shape Rack & Cue Ball Drag – Pool Game
+// Pool Game – sketch.js (Cue Shot Controls Stage)
 
 let Engine, World, Bodies, Composite;
 let engine, world;
@@ -22,6 +22,12 @@ const BALL_BLACK = '#111111';
 let balls = [];
 let tableLeft, tableRight, tableTop, tableBottom;
 let cueBall, draggingCue = false, dragOffset = { x: 0, y: 0 };
+
+let aimingCue = false;
+let aimStart = null;
+let breakTaken = false;
+const MAX_SHOT_DIST = 160; // pixels, max drag distance for full power
+const MAX_FORCE = 0.055;  
 
 function setup() {
   createCanvas(CANVAS_W, CANVAS_H).parent('game-canvas');
@@ -70,7 +76,6 @@ function createBall(x, y, color, type) {
 }
 
 function createJShapeRack(x0, y0) {
-  // Implementation per WPBA J-shape diagram, random color assignment (left-corner decides)
   const rackX = x0 + TABLE_W - 220;
   const rackY = CANVAS_H / 2;
   const rows = 5;
@@ -82,7 +87,6 @@ function createJShapeRack(x0, y0) {
 
   // Build the 15-ball array, fill each slot as per J-diagram and requirements:
   let formation = Array(15).fill(null);
-  // 8-ball in center of 3rd row (row=2, col=1; index=6)
   formation[6] = 'black';
 
   // Rear corners
@@ -164,8 +168,118 @@ function draw() {
   drawTable();
   for (let b of balls) drawBall(b);
   Engine.update(engine, 1000 / 60);
+  drawAimingGuide();
+  drawShotOverlay();
   fill(255); noStroke(); textSize(20);
-  text('Ball System: J-Rack Formation & Cue Ball Drag', 40, 40);
+  text('Cue Shot Controls & User Interaction', 40, 40);
+}
+
+function drawAimingGuide() {
+  if (aimingCue && !draggingCue && cueBall) {
+    let start = cueBall.body.position;
+    let end = { x: mouseX, y: mouseY };
+    let dragVec = createVector(mouseX - start.x, mouseY - start.y);
+    let cueLen = 330; // px, total cue length (scaled)
+    let cueGap = 8;   // px
+    let maxPowerLen = cueLen / 3;
+    let dragLen = constrain(dragVec.mag(), 0, MAX_SHOT_DIST);
+    let powerLen = map(dragLen, 0, MAX_SHOT_DIST, 0, maxPowerLen);
+    dragVec.setMag(dragLen);
+
+    let cueAngle = atan2(-dragVec.y, -dragVec.x);
+    let tipX = start.x + cos(cueAngle) * (-cueGap);
+    let tipY = start.y + sin(cueAngle) * (-cueGap);
+    let buttX = start.x + cos(cueAngle) * (-cueLen - cueGap);
+    let buttY = start.y + sin(cueAngle) * (-cueLen - cueGap);
+    let buttThick = 16, shaftThick = 8, tipThick = 12;
+
+    // Shadow
+    push();
+    stroke(40,30,12,40);
+    strokeWeight(32);
+    line(buttX+3, buttY+8, tipX+3, tipY+8);
+    pop();
+
+    // Butt
+    push();
+    stroke(90, 60, 30);
+    strokeWeight(buttThick);
+    line(
+      buttX, buttY,
+      start.x + cos(cueAngle) * (-cueLen * 0.8 - cueGap),
+      start.y + sin(cueAngle) * (-cueLen * 0.8 - cueGap)
+    );
+    stroke(65, 45, 25);
+    strokeWeight(buttThick + 2);
+    point(buttX, buttY);
+    pop();
+
+    // Shaft
+    push();
+    stroke(220, 180, 90);
+    strokeWeight(shaftThick);
+    line(
+      start.x + cos(cueAngle) * (-cueLen * 0.8 - cueGap),
+      start.y + sin(cueAngle) * (-cueLen * 0.8 - cueGap),
+      tipX, tipY
+    );
+    pop();
+
+    // Tip
+    push();
+    noStroke();
+    fill(240, 240, 190);
+    ellipse(tipX, tipY, tipThick, tipThick * 0.72);
+    pop();
+
+    // Leather pad
+    push();
+    noStroke();
+    fill(210, 210, 230);
+    ellipse(tipX, tipY, tipThick * 0.32, tipThick * 0.28);
+    pop();
+
+    // More transparent power indicator, maxes at 1/3 of cue
+    let pct = powerLen / maxPowerLen;
+    push();
+    stroke(80, 220, 255, 60 + 50 * pct); // more transparent
+    strokeWeight(36);
+    line(
+      start.x + cos(cueAngle) * (-cueGap - powerLen),
+      start.y + sin(cueAngle) * (-cueGap - powerLen),
+      tipX, tipY
+    );
+    pop();
+
+    // Power text
+    fill(240);
+    noStroke();
+    textSize(18);
+    textAlign(RIGHT, CENTER);
+    text('Power: ' + nf(100 * pct, 2, 0) + '%', start.x - 26, start.y + 14);
+    textAlign(LEFT, CENTER);
+
+    cursor('pointer');
+  } else {
+    cursor(ARROW);
+  }
+}
+
+function drawShotOverlay() {
+  if (!draggingCue && !aimingCue && !breakTaken && allBallsStopped()) {
+    fill(255, 230, 110, 210);
+    textSize(24);
+    textAlign(CENTER, TOP);
+    text('Drag the cue ball inside the D area', CANVAS_W / 2, 20);
+    textAlign(LEFT, TOP);
+  }
+  if (!draggingCue && !aimingCue && breakTaken && allBallsStopped()) {
+    fill(110, 255, 180, 220);
+    textSize(24);
+    textAlign(CENTER, TOP);
+    text('Click and drag to aim; release to shoot', CANVAS_W / 2, 20);
+    textAlign(LEFT, TOP);
+  }
 }
 
 function drawTable() {
@@ -217,7 +331,6 @@ function drawBaulkLineAndD() {
 function drawBall(b) {
   fill(b.color); stroke(40); strokeWeight(2);
   ellipse(b.body.position.x, b.body.position.y, BALL_DIAM);
-  // Highlight cue ball if dragging
   if (b === cueBall && draggingCue) {
     noFill(); stroke(255, 220, 0); strokeWeight(4);
     ellipse(b.body.position.x, b.body.position.y, BALL_DIAM + 10);
@@ -225,11 +338,17 @@ function drawBall(b) {
 }
 
 function mousePressed() {
-  if (isCueBall(mouseX, mouseY)) {
+  // Only allow dragging cue ball before break
+  if (!breakTaken && isCueBall(mouseX, mouseY)) {
     draggingCue = true;
     dragOffset.x = cueBall.body.position.x - mouseX;
     dragOffset.y = cueBall.body.position.y - mouseY;
     Matter.Body.setStatic(cueBall.body, true);
+  }
+  // Arm for cue shot (after break, balls stopped, not dragging cue)
+  if (breakTaken && allBallsStopped() && !draggingCue && isCueBall(mouseX, mouseY)) {
+    aimingCue = true;
+    aimStart = { x: mouseX, y: mouseY };
   }
 }
 
@@ -257,12 +376,31 @@ function mouseReleased() {
     draggingCue = false;
     Matter.Body.setStatic(cueBall.body, false);
   }
+  // Execute cue shot if armed and aiming, after break
+  if (aimingCue && breakTaken && allBallsStopped()) {
+    let cuePos = cueBall.body.position;
+    let shotVec = createVector(cuePos.x - mouseX, cuePos.y - mouseY);
+    let shotLen = constrain(shotVec.mag(), 0, MAX_SHOT_DIST);
+    shotVec.setMag(shotLen);
+    let power = map(shotLen, 0, MAX_SHOT_DIST, 0, MAX_FORCE);
+    shotVec.setMag(power);
+    Matter.Body.applyForce(
+      cueBall.body,
+      cueBall.body.position,
+      { x: shotVec.x, y: shotVec.y }
+    );
+    aimingCue = false;
+  }
+  // On first shot, mark break as taken
+  if (!breakTaken && !draggingCue) {
+    breakTaken = true;
+  }
 }
 
 function isCueBall(mx, my) {
   let dx = mx - cueBall.body.position.x;
   let dy = my - cueBall.body.position.y;
-  return sqrt(dx * dx + dy * dy) < BALL_RADIUS + 6;
+  return sqrt(dx * dx + dy * dy) < BALL_RADIUS + 16; // slightly bigger for ease of targeting
 }
 
 function allBallsStopped() {

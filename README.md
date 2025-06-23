@@ -1,7 +1,7 @@
-# Pool-Game
-Graphics Programming midterm project
+# Pool Game
+Graphics Programming midterm project.
 
-## Commit 1: Kick-off & Toolchain stage:
+## Stage 1: Kick-off & Toolchain stage:
 
 - Initialized Pool Game project structure with essential files: index.html, sketch.js, style.css, and README.md.
 - Integrated p5.js (rendering) and Matter.js (physics) via CDN links in index.html.
@@ -9,14 +9,14 @@ Graphics Programming midterm project
 - Verified project loads with green background and displays frame rate.
 - Confirmed working setup in both VS Code and Brackets environments.
 
-## Commit 2: Core Engine Setup
+## Stage 2: Core Engine Setup
 
 - Configures Matter.js physics engine for stable, gravity-free 2D simulation.
 - Sets static canvas size using constants for future refactoring.
 - Debug prints for engine state on launch.
 - Ready to add table boundaries and dynamic entities next.
 
-## Commit 3: Table & Boundaries
+## Stage 3: Table & Boundaries
 
 - Expanded canvas size to 1300x800 for a larger, more realistic pool table background and extra UI space.
 - Rendered a detailed visual table: green felt, wood border, and six marked pocket locations.
@@ -24,9 +24,17 @@ Graphics Programming midterm project
 - All walls and pocket markers are visually overlaid for easy alignment and debugging.
 - Project is now ready for adding the ball system and dynamic gameplay!
 
-## Commit 4: Ball Formation & Cue Ball Drag
+## Stage 4: Ball Formation & Cue Ball Drag
 
 - Implemented the official English eight-ball “J” rack: correct corner colors, stripes, and black ball always centered.
 - Ball color assignments are randomized each game (within formation rules).
 - Added interactive cue ball drag-and-drop before break, constrained to the D area, with visual highlight while dragging.
 - Improved code clarity, rack layout logic, and added explanatory comments.
+
+## Stage 5: Mouse‑Dominant Shot Mechanic & Cue Visuals
+
+- Cue stick is a long, detailed graphic (butt, shaft, tip, leather pad, shadow). It hovers ~8px behind the cue ball and rotates with mouse drag.
+- Shot mechanics: ball launches opposite the drag direction, matching pool physics.
+- Power indicator: a semi-transparent blue bar overlays the cue, increasing in length with drag. Max power occurs when drag reaches ⅓ of cue length for intuitive control.
+- UI feedback: cursor changes to pointer during aiming, with on-screen prompts guiding placement, aiming, and power selection.
+- Interactivity: before the break, the cue ball can be placed; after, drag to aim and release to shoot.
