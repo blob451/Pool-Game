@@ -38,3 +38,9 @@ Graphics Programming midterm project.
 - Power indicator: a semi-transparent blue bar overlays the cue, increasing in length with drag. Max power occurs when drag reaches ⅓ of cue length for intuitive control.
 - UI feedback: cursor changes to pointer during aiming, with on-screen prompts guiding placement, aiming, and power selection.
 - Interactivity: before the break, the cue ball can be placed; after, drag to aim and release to shoot.
+
+## Stage 6: Cue Ball Foul & Re-Spotting
+
+- When the cue ball is pocketed, it is automatically re-spotted in the D area after all balls stop.
+- Player is prompted to drag and place the cue ball before resuming play.
+- Logic prevents overlap with other balls and restores all normal mechanics for the next turn.

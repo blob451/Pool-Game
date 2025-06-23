@@ -22,6 +22,10 @@ const BALL_BLACK = '#111111';
 let balls = [];
 let tableLeft, tableRight, tableTop, tableBottom;
 let cueBall, draggingCue = false, dragOffset = { x: 0, y: 0 };
+let pocketSensors = [];
+let pocketedBalls = [];
+let cueFoul = false, foulMsgTimer = 0;
+let cueNeedsRespotted = false;
 
 let aimingCue = false;
 let aimStart = null;
@@ -62,6 +66,41 @@ function setup() {
   let rackBalls = createJShapeRack(x0, y0);
   for (let b of rackBalls) balls.push(b);
   for (let b of balls) Composite.add(world, b.body);
+
+  // --- POCKET SENSORS ---
+  pocketSensors = [];
+  let pocketCenters = [
+    // 4 corners
+    [x0, y0],
+    [x0 + TABLE_W, y0],
+    [x0, y0 + TABLE_H],
+    [x0 + TABLE_W, y0 + TABLE_H],
+    // 2 middles
+    [CANVAS_W / 2, y0],
+    [CANVAS_W / 2, y0 + TABLE_H]
+  ];
+  for (let [px, py] of pocketCenters) {
+    let sensor = Bodies.circle(px, py, POCKET_RADIUS * 0.94, {
+      isStatic: true, isSensor: true, label: 'pocketSensor'
+    });
+    pocketSensors.push(sensor);
+    Composite.add(world, sensor);
+  }
+
+  // --- Pocket event handling ---
+  Matter.Events.on(engine, 'collisionStart', function(event) {
+    for (let pair of event.pairs) {
+      let a = pair.bodyA, b = pair.bodyB;
+      let ba = balls.find(ball => ball.body === a);
+      let bb = balls.find(ball => ball.body === b);
+      let isSensorA = a.label === 'pocketSensor', isSensorB = b.label === 'pocketSensor';
+      if (ba && isSensorB) pocketBall(ba);
+      if (bb && isSensorA) pocketBall(bb);
+    }
+  });
+  pocketedBalls = [];
+  cueFoul = false;
+  foulMsgTimer = 0;
 }
 
 function createBall(x, y, color, type) {
@@ -172,6 +211,50 @@ function draw() {
   drawShotOverlay();
   fill(255); noStroke(); textSize(20);
   text('Cue Shot Controls & User Interaction', 40, 40);
+
+    // Remove pocketed balls after physics step
+  for (let i = balls.length - 1; i >= 0; i--) {
+    if (balls[i].toRemove) {
+      Composite.remove(world, balls[i].body);
+      balls.splice(i, 1);
+    }
+  }
+  // Draw UI list of pocketed balls
+  drawPocketedBallsUI();
+  // Draw foul message if needed
+  if (cueFoul && foulMsgTimer > 0) {
+    fill(255,50,50,230);
+    noStroke();
+    textSize(32);
+    textAlign(CENTER, TOP);
+    text('Cue Ball Pocketed – FOUL!', CANVAS_W / 2, 70);
+    textAlign(LEFT, TOP);
+    foulMsgTimer--;
+  }
+
+    // Cue ball respot logic after all balls stop
+  if (cueNeedsRespotted && allBallsStopped()) {
+    // Find default spot in D (use same as setup)
+    let x0 = (CANVAS_W - TABLE_W) / 2;
+    let baulkX = x0 + TABLE_W * 0.25;
+    let dRadius = TABLE_H * 0.20;
+    let cx = baulkX, cy = CANVAS_H / 2;
+    let cueX = cx;
+    let cueY = cy;
+    // Nudge if collides with other balls
+    for (let tries = 0; tries < 10; tries++) {
+      let collides = balls.some(b => dist(b.body.position.x, b.body.position.y, cueX, cueY) < BALL_DIAM + 2);
+      if (!collides) break;
+      cueY += 12; // move down in D if needed
+    }
+    cueBall = createBall(cueX, cueY, BALL_WHITE, 'cue');
+    balls.unshift(cueBall);
+    Composite.add(world, cueBall.body);
+    Matter.Body.setStatic(cueBall.body, true); // allow dragging to re-place
+    cueNeedsRespotted = false;
+    breakTaken = false; // allow drag mechanic again
+    cueFoul = false;
+  }
 }
 
 function drawAimingGuide() {
@@ -307,13 +390,22 @@ function markPockets() {
   let x1 = x0 + TABLE_W;
   let y1 = y0 + TABLE_H;
   let midX = CANVAS_W / 2;
-  fill(0); stroke(200); strokeWeight(2);
+  fill(0);
+  stroke(200);
+  strokeWeight(2);
   ellipse(x0, y0, POCKET_RADIUS * 2);
   ellipse(x1, y0, POCKET_RADIUS * 2);
   ellipse(x0, y1, POCKET_RADIUS * 2);
   ellipse(x1, y1, POCKET_RADIUS * 2);
   ellipse(midX, y0, POCKET_RADIUS * 2);
   ellipse(midX, y1, POCKET_RADIUS * 2);
+  // Debug: render sensors
+  noFill();
+  stroke(100, 200, 255, 90);
+  strokeWeight(2);
+  for (let s of pocketSensors) {
+    ellipse(s.position.x, s.position.y, POCKET_RADIUS * 1.88);
+  }
 }
 
 function drawBaulkLineAndD() {
@@ -338,14 +430,13 @@ function drawBall(b) {
 }
 
 function mousePressed() {
-  // Only allow dragging cue ball before break
-  if (!breakTaken && isCueBall(mouseX, mouseY)) {
+  // Allow dragging cue ball if not breakTaken or cueNeedsRespotted
+  if ((!breakTaken || cueNeedsRespotted) && isCueBall(mouseX, mouseY)) {
     draggingCue = true;
     dragOffset.x = cueBall.body.position.x - mouseX;
     dragOffset.y = cueBall.body.position.y - mouseY;
     Matter.Body.setStatic(cueBall.body, true);
   }
-  // Arm for cue shot (after break, balls stopped, not dragging cue)
   if (breakTaken && allBallsStopped() && !draggingCue && isCueBall(mouseX, mouseY)) {
     aimingCue = true;
     aimStart = { x: mouseX, y: mouseY };
@@ -406,4 +497,31 @@ function isCueBall(mx, my) {
 function allBallsStopped() {
   for (let b of balls) if (b.body.speed > 0.2) return false;
   return true;
+}
+
+function pocketBall(ball) {
+  if (ball.type === 'cue') {
+    cueFoul = true;
+    foulMsgTimer = 120; // frames
+    cueNeedsRespotted = true;
+  }
+  if (!pocketedBalls.includes(ball))
+    pocketedBalls.push(ball);
+  ball.toRemove = true;
+}
+
+function drawPocketedBallsUI() {
+  fill(240);
+  textSize(18);
+  textAlign(RIGHT, TOP);
+  text('Pocketed:', CANVAS_W - 24, 26);
+  let x = CANVAS_W - 70, y = 62;
+  for (let b of pocketedBalls) {
+    fill(b.color);
+    stroke(40);
+    strokeWeight(2);
+    ellipse(x, y, BALL_DIAM);
+    y += BALL_DIAM + 8;
+  }
+  textAlign(LEFT, TOP);
 }
