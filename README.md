@@ -44,3 +44,11 @@ Graphics Programming midterm project.
 - When the cue ball is pocketed, it is automatically re-spotted in the D area after all balls stop.
 - Player is prompted to drag and place the cue ball before resuming play.
 - Logic prevents overlap with other balls and restores all normal mechanics for the next turn.
+
+## Stage 7: Refactoring and Polish Update
+
+- Improved overall code structure for readability and maintainability.
+- Enhanced game stability, ensuring robust cue ball placement and pocket interactions.
+- Optimized physics performance and rendering efficiency.
+- Visual enhancements include clearer cue mechanics, power indicators, and UI prompts.
+- Comprehensive inline commenting and clean function modularization added.
