@@ -1,4 +1,4 @@
-// Pool Game – sketch.js (Optimized, Polished, and Refactored)
+// Pool Game
 
 let Engine, World, Bodies, Composite;
 let engine, world;
@@ -11,6 +11,13 @@ const BALL_DIAM = 26, BALL_RADIUS = BALL_DIAM / 2;
 const BALL_WHITE = '#FFFFFF', BALL_RED = '#C30000', BALL_YELLOW = '#FFEA00', BALL_BLACK = '#111111';
 const MAX_SHOT_DIST = 160, MAX_FORCE = 0.055;
 
+// Polish settings
+const OVERLAY_FADE_SPEED = 0.07;
+const D_HIGHLIGHT_COLOR = 'rgba(100,220,250,0.20)';
+const SINK_FADE_FRAMES = 18;
+const POWER_INDICATOR_COLOR = [80, 220, 255];
+const SCOREBOARD_BG = [20, 25, 34, 220];
+
 // Game State
 let balls = [], pocketSensors = [], pocketedBalls = [],
     tableLeft, tableRight, tableTop, tableBottom,
@@ -18,9 +25,9 @@ let balls = [], pocketSensors = [], pocketedBalls = [],
     cueFoul = false, foulMsgTimer = 0, cueNeedsRespotted = false,
     aimingCue = false, aimStart = null, breakTaken = false;
 
-/**
- * p5.js setup – Initializes canvas, physics engine, pool table, balls, and pockets
- */
+let overlayAlpha = 1.0;
+let sinkAnims = [];
+
 function setup() {
   createCanvas(CANVAS_W, CANVAS_H).parent('game-canvas');
   Engine = Matter.Engine; World = Matter.World;
@@ -35,21 +42,14 @@ function setup() {
   tableLeft   = Bodies.rectangle(x0 - WALL_THICK / 2, CANVAS_H / 2, WALL_THICK, TABLE_H + WALL_THICK * 2, { isStatic: true, restitution: 1, friction: 0 });
   tableRight  = Bodies.rectangle(x0 + TABLE_W + WALL_THICK / 2, CANVAS_H / 2, WALL_THICK, TABLE_H + WALL_THICK * 2, { isStatic: true, restitution: 1, friction: 0 });
   Composite.add(world, [tableTop, tableBottom, tableLeft, tableRight]);
-
-  // Reset all state
-  balls = []; pocketedBalls = []; pocketSensors = [];
-  cueFoul = false; foulMsgTimer = 0; cueNeedsRespotted = false; breakTaken = false;
-
-  // Add cue ball (white) at default D position
+  balls = []; pocketedBalls = []; pocketSensors = []; sinkAnims = [];
+  cueFoul = false; foulMsgTimer = 0; cueNeedsRespotted = false; breakTaken = false; overlayAlpha = 1.0;
   let cueX = x0 + 130, cueY = CANVAS_H / 2;
   cueBall = createBall(cueX, cueY, BALL_WHITE, 'cue');
   balls.push(cueBall);
-  // Place rack (English 8-ball J-shape)
   let rackBalls = createJShapeRack(x0, y0);
   for (let b of rackBalls) balls.push(b);
   for (let b of balls) Composite.add(world, b.body);
-
-  // POCKET SENSORS (6)
   let pocketCenters = [
     [x0, y0], [x0 + TABLE_W, y0], [x0, y0 + TABLE_H], [x0 + TABLE_W, y0 + TABLE_H],
     [CANVAS_W / 2, y0], [CANVAS_W / 2, y0 + TABLE_H]
@@ -60,9 +60,7 @@ function setup() {
     });
     pocketSensors.push(sensor); Composite.add(world, sensor);
   }
-
-  // POCKET EVENT HANDLING (single listener only)
-  Matter.Events.off(engine, 'collisionStart'); // Prevent double eventing
+  Matter.Events.off(engine, 'collisionStart');
   Matter.Events.on(engine, 'collisionStart', function(event) {
     for (let pair of event.pairs) {
       let a = pair.bodyA, b = pair.bodyB;
@@ -132,37 +130,61 @@ function shuffleInPlace(arr) {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
 }
+
 function draw() {
-  background(35, 22, 12);
+  background(30, 18, 10);
   drawTable();
+  // Ball shadow & felt polish
+  for (let b of balls) {
+    // ball shadow
+    fill(0,40,60,80); noStroke();
+    ellipse(b.body.position.x + 2, b.body.position.y + 7, BALL_DIAM * 0.82, BALL_DIAM * 0.62);
+  }
+  // Animate fade for balls pocketed this frame
+  for (let anim of sinkAnims) {
+    let fade = anim.fade;
+    fill(anim.color[0], anim.color[1], anim.color[2], fade * 255);
+    stroke(40, fade * 130);
+    ellipse(anim.x, anim.y, BALL_DIAM * fade);
+    anim.fade -= 1 / SINK_FADE_FRAMES;
+  }
+  sinkAnims = sinkAnims.filter(anim => anim.fade > 0);
+  // Main balls
   for (let b of balls) drawBall(b);
   Engine.update(engine, 1000 / 60);
   drawAimingGuide();
   drawShotOverlay();
+  drawPocketedBallsUI();
   fill(255); noStroke(); textSize(20);
   text('Cue Shot Controls & User Interaction', 40, 40);
 
   // Remove pocketed balls after physics step
   for (let i = balls.length - 1; i >= 0; i--) {
     if (balls[i].toRemove) {
+      sinkAnims.push({
+        x: balls[i].body.position.x,
+        y: balls[i].body.position.y,
+        color: hexToRgb(balls[i].color),
+        fade: 1.0
+      });
       Composite.remove(world, balls[i].body);
       balls.splice(i, 1);
     }
   }
-  // Draw UI list of pocketed balls
-  drawPocketedBallsUI();
-
-  // Draw foul message if needed
+  // Draw foul message if needed (with fade)
   if (cueFoul && foulMsgTimer > 0) {
-    fill(255, 50, 50, 230);
+    fill(255, 50, 50, 230 * overlayAlpha);
     noStroke();
     textSize(32);
     textAlign(CENTER, TOP);
     text('Cue Ball Pocketed – FOUL!', CANVAS_W / 2, 70);
     textAlign(LEFT, TOP);
     foulMsgTimer--;
+    overlayAlpha -= OVERLAY_FADE_SPEED;
+    overlayAlpha = constrain(overlayAlpha, 0, 1);
+  } else {
+    overlayAlpha = 1.0;
   }
-
   // Cue ball respot logic after all balls stop
   if (cueNeedsRespotted && allBallsStopped()) {
     let x0 = (CANVAS_W - TABLE_W) / 2;
@@ -437,4 +459,10 @@ function drawPocketedBallsUI() {
     y += BALL_DIAM + 8;
   }
   textAlign(LEFT, TOP);
+}
+
+function hexToRgb(hex) {
+  // #AABBCC → [170, 187, 204]
+  let c = hex.replace('#','');
+  return [parseInt(c.substring(0,2),16), parseInt(c.substring(2,4),16), parseInt(c.substring(4,6),16)];
 }
