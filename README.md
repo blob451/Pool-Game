@@ -52,3 +52,8 @@ Graphics Programming midterm project.
 - Optimized physics performance and rendering efficiency.
 - Visual enhancements include clearer cue mechanics, power indicators, and UI prompts.
 - Comprehensive inline commenting and clean function modularization added.
+
+## Stage 7.1: Polish pass: UI/visuals and ball animations
+
+- Enhanced visual polish: overlays fade, ball pocketing animates, table/felt shading improved.
+- Improved cue/shot feedback, foul message transitions, and D area highlight.
