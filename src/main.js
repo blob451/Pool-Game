@@ -7,7 +7,7 @@
 let gameManager;
 
 function setup() {
-    createCanvas(800, 400); // (Resize to snooker proportions later)
+    createCanvas(1200, 600); // (Resize to snooker proportions later)
     // Physics engine setup will now be handled inside GameManager
     gameManager = new GameManager();
 }
