@@ -37,8 +37,8 @@ class Table {
 
         // Ball spots (all vertical positions now from playMinY)
         this.spots = {
-            black: { x: this.x, y: this.playMinY + this.height / 11 },
-            pink:  { x: this.x, y: this.playMinY + this.height / 4 },
+            black: { x: this.playMinX + (this.width * 10 / 11), y: this.y },
+            pink:  { x: this.playMinX + (this.width * 9 / 12), y: this.y },
             blue:  { x: this.x, y: this.y },
             brown: { x: this.baulkLineX, y: this.y },
             yellow:{ x: this.baulkLineX, y: this.y + this.dRadius },
