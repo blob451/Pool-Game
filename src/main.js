@@ -1,27 +1,33 @@
 // src/main.js
 /**
- * Main entry point for Snooker Game (ported from Pool Game)
- * Handles p5.js setup/draw and global input, delegates all game logic to GameManager.
+ * p5.js entry. Canvas always starts at (0,0), fills browser, dark background, no DOM centering.
  */
-
 let gameManager;
 
 function setup() {
-    createCanvas(1200, 600); // (Resize to snooker proportions later)
-    // Physics engine setup will now be handled inside GameManager
+    // Full-size canvas for 1500x1000 px
+    let canvas = createCanvas(1500, 1000);
+    canvas.position(0, 0); // Always top-left
     gameManager = new GameManager();
 }
 
 function draw() {
-    background(34, 139, 34); // Green felt background
-    gameManager.update();    // Advance game state, physics, turns
-    gameManager.draw();      // Render table, balls, cue, UI
+    background(0, 110, 0); // dark outer background
+    gameManager.update();
+    gameManager.draw();
+
+    // UI overlays (scores) can go here
+    fill(255);
+    textSize(28);
+    textAlign(LEFT, TOP);
+    text(`Player 1: ${gameManager.scoring.getScore(0)}`, 30, 16);
+    textAlign(RIGHT, TOP);
+    text(`Player 2: ${gameManager.scoring.getScore(1)}`, width - 30, 16);
 }
 
 function mousePressed() {
     gameManager.handleInput('mousePressed');
 }
-
 function mouseReleased() {
     gameManager.handleInput('mouseReleased');
 }

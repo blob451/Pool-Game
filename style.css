@@ -1,32 +1,21 @@
-/* style.css - Basic styling for Snooker Game modular project */
+/* style.css - No centering, no margin, p5 canvas fills window at top-left. */
 
 body {
-    background: #222;
-    font-family: 'Segoe UI', Arial, sans-serif;
     margin: 0;
     padding: 0;
-    color: #fff;
+    background: #222; /* dark outer background */
+    font-family: 'Segoe UI', Arial, sans-serif;
 }
 
-main {
-    max-width: 900px;
-    margin: 30px auto 0 auto;
-    padding: 20px;
-    background: #1b3a23;
-    border-radius: 12px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+main, #game-container, canvas {
+    display: block;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    border-radius: 0;
+    background: none;
 }
 
 h1 {
-    text-align: center;
-    font-size: 2.2em;
-    letter-spacing: 1px;
-    margin-bottom: 24px;
-}
-
-#game-container, canvas {
-    display: block;
-    margin: 0 auto;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.15);
-    border-radius: 16px;
+    display: none; /* Hide title if using p5 only */
 }

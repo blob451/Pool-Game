@@ -1,64 +1,69 @@
 // src/Table.js
 /**
- * Represents the snooker table with final polish: minimal round corners, soft shadows, faint spot halos, no UI overlays.
- * Only table rendering here: all UI/score overlays should be handled outside Table.js.
+ * All spots, markings, D, and baulk line use playing area edges (not canvas center).
+ * Ball spots will now be in the correct snooker locations.
  */
 class Table {
     constructor() {
-        // Table sizing (for 1200x600 canvas)
+        // PLAYING AREA (inside cushions)
         this.width = 1000;
         this.height = 500;
-        this.margin = 24; // Now much less margin
-        this.x = width / 2;
-        this.y = height / 2;
 
-        // Layering sizes/colors
+        // Table position: horizontally centered, vertically offset
+        this.tableYOffset = 90;
+        this.x = width / 2;
+        this.y = height / 2 + this.tableYOffset;
+
+        // Wall/rail sizing
+        this.woodThickness = 70;
         this.railWidth = 28;
         this.railColor = color(116, 87, 48);
-        this.wallWidth = 44;
-        this.wallColor = color(90, 57, 20);
-        this.wallShadowColor = color(60, 32, 10, 70);
+        this.woodColor = color(90, 57, 20);
+        this.woodShadowColor = color(60, 32, 10, 70);
 
-        // Felt colors (gradient/fake shadow at edge)
+        // Felt
         this.feltColor = color(26, 89, 26);
         this.feltShadowColor = color(12, 37, 15, 40);
 
-        // Baulk line/D
-        this.baulkLineX = this.x - this.width / 4;
-        this.dRadius = 56;
+        // Playing area edges (felt area, inside rails/wood)
+        this.playMinX = this.x - this.width / 2;
+        this.playMaxX = this.x + this.width / 2;
+        this.playMinY = this.y - this.height / 2;
+        this.playMaxY = this.y + this.height / 2;
+
+        // Baulk line & D
+        this.baulkLineX = this.playMinX + this.width / 5; // 1/5 from left cushion
+        this.dRadius = this.height / 6;
+
+        // Ball spots (all vertical positions now from playMinY)
+        this.spots = {
+            black: { x: this.x, y: this.playMinY + this.height / 11 },
+            pink:  { x: this.x, y: this.playMinY + this.height / 4 },
+            blue:  { x: this.x, y: this.y },
+            brown: { x: this.baulkLineX, y: this.y },
+            yellow:{ x: this.baulkLineX, y: this.y + this.dRadius },
+            green: { x: this.baulkLineX, y: this.y - this.dRadius },
+        };
 
         // Pockets
         this.pockets = [
-            { x: this.x - this.width / 2, y: this.y - this.height / 2 },
-            { x: this.x, y: this.y - this.height / 2 },
-            { x: this.x + this.width / 2, y: this.y - this.height / 2 },
-            { x: this.x - this.width / 2, y: this.y + this.height / 2 },
-            { x: this.x, y: this.y + this.height / 2 },
-            { x: this.x + this.width / 2, y: this.y + this.height / 2 },
+            { x: this.playMinX, y: this.playMinY },
+            { x: this.x, y: this.playMinY },
+            { x: this.playMaxX, y: this.playMinY },
+            { x: this.playMinX, y: this.playMaxY },
+            { x: this.x, y: this.playMaxY },
+            { x: this.playMaxX, y: this.playMaxY },
         ];
         this.pocketRadius = 16;
 
-        // Ball spots
-        this.spots = {
-            yellow:   { x: this.baulkLineX, y: this.y + this.dRadius, c: color(255, 234, 79, 30) },
-            green:    { x: this.baulkLineX, y: this.y - this.dRadius, c: color(34, 177, 76, 24) },
-            brown:    { x: this.baulkLineX, y: this.y, c: color(130, 60, 18, 20) },
-            blue:     { x: this.x, y: this.y, c: color(63, 131, 201, 16) },
-            pink:     { x: this.x + this.width / 4, y: this.y, c: color(255, 192, 203, 18) },
-            black:    { x: this.x + this.width / 2 - 36, y: this.y, c: color(0, 0, 0, 30) },
-        };
-
-        // Physics boundaries (invisible, already correct)
+        // Physics boundaries (invisible rails)
         this.boundaries = [];
         this.createBoundaries();
     }
 
     draw() {
-        // LAYER ORDER: Wood (outside) → Wood inner shadow → Rails → Felt → Pocket shadows → Pockets → Markings → Spots
-
-        // Outer wood
         this.drawWood();
-        this.drawWoodInnerShadow();
+        this.drawWoodShadow();
         this.drawRails();
         this.drawFelt();
         this.drawPocketShadows();
@@ -68,46 +73,36 @@ class Table {
     }
 
     drawWood() {
-        fill(this.wallColor);
+        fill(this.woodColor);
         noStroke();
         rectMode(CENTER);
-        rect(this.x, this.y, this.width + this.wallWidth, this.height + this.wallWidth, 4);
+        rect(this.x, this.y, this.width + this.woodThickness * 2, this.height + this.woodThickness * 2, 8);
     }
-
-    drawWoodInnerShadow() {
+    drawWoodShadow() {
         noFill();
-        stroke(this.wallShadowColor);
-        strokeWeight(10);
+        stroke(this.woodShadowColor);
+        strokeWeight(18);
         rectMode(CENTER);
-        rect(this.x, this.y, this.width + this.wallWidth - 16, this.height + this.wallWidth - 16, 4);
+        rect(this.x, this.y, this.width + this.woodThickness * 2 - 24, this.height + this.woodThickness * 2 - 24, 8);
         noStroke();
     }
-
     drawRails() {
         fill(this.railColor);
         noStroke();
         rectMode(CENTER);
-        rect(this.x, this.y, this.width + this.railWidth, this.height + this.railWidth, 4);
-        // Rail shine
-        stroke(255, 245, 180, 45);
-        strokeWeight(3);
-        noFill();
-        rect(this.x, this.y, this.width + this.railWidth, this.height + this.railWidth, 4);
-        noStroke();
+        rect(this.x, this.y, this.width + this.railWidth * 2, this.height + this.railWidth * 2, 4);
     }
-
     drawFelt() {
+        fill(this.feltColor);
         rectMode(CENTER);
         noStroke();
-        fill(this.feltColor);
-        rect(this.x, this.y, this.width, this.height, 3);
-        // Felt shadow/gradient (manually faked)
+        rect(this.x, this.y, this.width, this.height, 2);
+        // Felt shadow/gradient
         for (let i = 0; i < 8; i++) {
             fill(red(this.feltShadowColor), green(this.feltShadowColor), blue(this.feltShadowColor), 30 - i * 2);
-            rect(this.x, this.y, this.width - i * 11, this.height - i * 11, 3);
+            rect(this.x, this.y, this.width - i * 12, this.height - i * 12, 2);
         }
     }
-
     drawPocketShadows() {
         for (let p of this.pockets) {
             noStroke();
@@ -115,7 +110,6 @@ class Table {
             ellipse(p.x, p.y, this.pocketRadius * 2.5);
         }
     }
-
     drawPockets() {
         fill(10, 10, 10);
         noStroke();
@@ -123,44 +117,30 @@ class Table {
             ellipse(p.x, p.y, this.pocketRadius * 2);
         }
     }
-
-    drawSpots() {
-        for (let key in this.spots) {
-            let s = this.spots[key];
-            fill(s.c);
-            ellipse(s.x, s.y, 13); // Very faint halo
-            fill(255, 230);
-            ellipse(s.x, s.y, 4);  // White spot
-        }
-    }
-
     drawMarkings() {
-        // Baulk line (vertical, left side)
         stroke(255);
         strokeWeight(2);
-        line(this.baulkLineX, this.y - this.height / 2, this.baulkLineX, this.y + this.height / 2);
-        // D arc (faces INTO table)
+        line(this.baulkLineX, this.playMinY, this.baulkLineX, this.playMaxY);
         noFill();
-        stroke(255);
-        strokeWeight(2);
         arc(this.baulkLineX, this.y, this.dRadius * 2, this.dRadius * 2, HALF_PI, 3 * HALF_PI);
-        // Double-draw for soft anti-aliasing
         stroke(255, 140);
         strokeWeight(4);
         arc(this.baulkLineX, this.y, this.dRadius * 2, this.dRadius * 2, HALF_PI, 3 * HALF_PI);
         noStroke();
     }
-
+    drawSpots() {
+        for (let key in this.spots) {
+            let s = this.spots[key];
+            fill(255, 230);
+            ellipse(s.x, s.y, 6);
+        }
+    }
     createBoundaries() {
         this.boundaries = [];
-        // Top
-        this.boundaries.push(Matter.Bodies.rectangle(this.x, this.y - this.height / 2 - 8, this.width, 16, { isStatic: true, render: { visible: false } }));
-        // Bottom
-        this.boundaries.push(Matter.Bodies.rectangle(this.x, this.y + this.height / 2 + 8, this.width, 16, { isStatic: true, render: { visible: false } }));
-        // Left
-        this.boundaries.push(Matter.Bodies.rectangle(this.x - this.width / 2 - 8, this.y, 16, this.height, { isStatic: true, render: { visible: false } }));
-        // Right
-        this.boundaries.push(Matter.Bodies.rectangle(this.x + this.width / 2 + 8, this.y, 16, this.height, { isStatic: true, render: { visible: false } }));
+        this.boundaries.push(Matter.Bodies.rectangle(this.x, this.playMinY - 8, this.width, 16, { isStatic: true, render: { visible: false } }));
+        this.boundaries.push(Matter.Bodies.rectangle(this.x, this.playMaxY + 8, this.width, 16, { isStatic: true, render: { visible: false } }));
+        this.boundaries.push(Matter.Bodies.rectangle(this.playMinX - 8, this.y, 16, this.height, { isStatic: true, render: { visible: false } }));
+        this.boundaries.push(Matter.Bodies.rectangle(this.playMaxX + 8, this.y, 16, this.height, { isStatic: true, render: { visible: false } }));
         for (let b of this.boundaries) {
             Matter.World.add(world, b);
         }
