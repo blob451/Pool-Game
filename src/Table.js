@@ -1,7 +1,6 @@
 // src/Table.js
 /**
- * All spots, markings, D, and baulk line use playing area edges (not canvas center).
- * Ball spots will now be in the correct snooker locations.
+ * This version adds the missing isInPlayingArea helper function and refines boundaries.
  */
 class Table {
     constructor() {
@@ -25,17 +24,17 @@ class Table {
         this.feltColor = color(26, 89, 26);
         this.feltShadowColor = color(12, 37, 15, 40);
 
-        // Playing area edges (felt area, inside rails/wood)
+        // Playing area edges
         this.playMinX = this.x - this.width / 2;
         this.playMaxX = this.x + this.width / 2;
         this.playMinY = this.y - this.height / 2;
         this.playMaxY = this.y + this.height / 2;
 
         // Baulk line & D
-        this.baulkLineX = this.playMinX + this.width / 5; // 1/5 from left cushion
+        this.baulkLineX = this.playMinX + this.width / 5;
         this.dRadius = this.height / 6;
 
-        // Ball spots (all vertical positions now from playMinY)
+        // Ball spots
         this.spots = {
             black: { x: this.playMinX + (this.width * 10 / 11), y: this.y },
             pink:  { x: this.playMinX + (this.width * 9 / 12), y: this.y },
@@ -46,6 +45,7 @@ class Table {
         };
 
         // Pockets
+        this.pocketRadius = 18;
         this.pockets = [
             { x: this.playMinX, y: this.playMinY },
             { x: this.x, y: this.playMinY },
@@ -54,11 +54,24 @@ class Table {
             { x: this.x, y: this.playMaxY },
             { x: this.playMaxX, y: this.playMaxY },
         ];
-        this.pocketRadius = 16;
 
-        // Physics boundaries (invisible rails)
+        // Physics boundaries
         this.boundaries = [];
         this.createBoundaries();
+    }
+    
+    /**
+     * Checks if a given position is inside the table's playing area.
+     * @param {object} position - A Matter.js position vector { x, y }.
+     * @returns {boolean}
+     */
+    isInPlayingArea(position) {
+        return (
+            position.x > this.playMinX &&
+            position.x < this.playMaxX &&
+            position.y > this.playMinY &&
+            position.y < this.playMaxY
+        );
     }
 
     draw() {
@@ -78,6 +91,7 @@ class Table {
         rectMode(CENTER);
         rect(this.x, this.y, this.width + this.woodThickness * 2, this.height + this.woodThickness * 2, 8);
     }
+
     drawWoodShadow() {
         noFill();
         stroke(this.woodShadowColor);
@@ -86,23 +100,25 @@ class Table {
         rect(this.x, this.y, this.width + this.woodThickness * 2 - 24, this.height + this.woodThickness * 2 - 24, 8);
         noStroke();
     }
+
     drawRails() {
         fill(this.railColor);
         noStroke();
         rectMode(CENTER);
         rect(this.x, this.y, this.width + this.railWidth * 2, this.height + this.railWidth * 2, 4);
     }
+
     drawFelt() {
         fill(this.feltColor);
         rectMode(CENTER);
         noStroke();
         rect(this.x, this.y, this.width, this.height, 2);
-        // Felt shadow/gradient
         for (let i = 0; i < 8; i++) {
             fill(red(this.feltShadowColor), green(this.feltShadowColor), blue(this.feltShadowColor), 30 - i * 2);
             rect(this.x, this.y, this.width - i * 12, this.height - i * 12, 2);
         }
     }
+
     drawPocketShadows() {
         for (let p of this.pockets) {
             noStroke();
@@ -110,6 +126,7 @@ class Table {
             ellipse(p.x, p.y, this.pocketRadius * 2.5);
         }
     }
+
     drawPockets() {
         fill(10, 10, 10);
         noStroke();
@@ -117,6 +134,7 @@ class Table {
             ellipse(p.x, p.y, this.pocketRadius * 2);
         }
     }
+
     drawMarkings() {
         stroke(255);
         strokeWeight(2);
@@ -128,6 +146,7 @@ class Table {
         arc(this.baulkLineX, this.y, this.dRadius * 2, this.dRadius * 2, HALF_PI, 3 * HALF_PI);
         noStroke();
     }
+
     drawSpots() {
         for (let key in this.spots) {
             let s = this.spots[key];
@@ -135,12 +154,29 @@ class Table {
             ellipse(s.x, s.y, 6);
         }
     }
+    
     createBoundaries() {
-        this.boundaries = [];
-        this.boundaries.push(Matter.Bodies.rectangle(this.x, this.playMinY - 8, this.width, 16, { isStatic: true, render: { visible: false } }));
-        this.boundaries.push(Matter.Bodies.rectangle(this.x, this.playMaxY + 8, this.width, 16, { isStatic: true, render: { visible: false } }));
-        this.boundaries.push(Matter.Bodies.rectangle(this.playMinX - 8, this.y, 16, this.height, { isStatic: true, render: { visible: false } }));
-        this.boundaries.push(Matter.Bodies.rectangle(this.playMaxX + 8, this.y, 16, this.height, { isStatic: true, render: { visible: false } }));
+        const boundaryOptions = { 
+            isStatic: true,
+            restitution: 0.8,
+            render: { visible: false } 
+        };
+        const railThickness = 16;
+        const pocketOffset = this.pocketRadius * 1.8;
+
+        const longRailWidth = (this.width / 2) - pocketOffset;
+        
+        this.boundaries.push(Matter.Bodies.rectangle(this.playMinX + longRailWidth / 2, this.playMinY - railThickness / 2, longRailWidth, railThickness, boundaryOptions));
+        this.boundaries.push(Matter.Bodies.rectangle(this.playMaxX - longRailWidth / 2, this.playMinY - railThickness / 2, longRailWidth, railThickness, boundaryOptions));
+        
+        this.boundaries.push(Matter.Bodies.rectangle(this.playMinX + longRailWidth / 2, this.playMaxY + railThickness / 2, longRailWidth, railThickness, boundaryOptions));
+        this.boundaries.push(Matter.Bodies.rectangle(this.playMaxX - longRailWidth / 2, this.playMaxY + railThickness / 2, longRailWidth, railThickness, boundaryOptions));
+        
+        const shortRailHeight = this.height - (pocketOffset * 2);
+        
+        this.boundaries.push(Matter.Bodies.rectangle(this.playMinX - railThickness / 2, this.y, railThickness, shortRailHeight, boundaryOptions));
+        this.boundaries.push(Matter.Bodies.rectangle(this.playMaxX + railThickness / 2, this.y, railThickness, shortRailHeight, boundaryOptions));
+
         for (let b of this.boundaries) {
             Matter.World.add(world, b);
         }

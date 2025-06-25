@@ -1,6 +1,6 @@
 // src/main.js
 /**
- * p5.js entry. Canvas always starts at (0,0), fills browser, dark background, no DOM centering.
+ * p5.js entry. This version includes mouseDragged to handle aiming correctly.
  */
 let gameManager;
 
@@ -16,7 +16,7 @@ function draw() {
     gameManager.update();
     gameManager.draw();
 
-    // UI overlays (scores) can go here
+    // UI overlays (scores) are now the single source of truth for the score display.
     fill(255);
     textSize(28);
     textAlign(LEFT, TOP);
@@ -28,6 +28,11 @@ function draw() {
 function mousePressed() {
     gameManager.handleInput('mousePressed');
 }
+
+function mouseDragged() {
+    gameManager.handleInput('mouseDragged');
+}
+
 function mouseReleased() {
     gameManager.handleInput('mouseReleased');
 }

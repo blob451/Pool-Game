@@ -1,7 +1,7 @@
 // src/Cue.js
 /**
  * Handles cue aiming, visual feedback, and shooting logic.
- * Integrates user input (mouse drag) with cue ball force application.
+ * This version has refined power scaling to prevent overly powerful shots.
  */
 class Cue {
     constructor(cueBall) {
@@ -9,13 +9,14 @@ class Cue {
         this.aiming = false;
         this.start = null; // Mouse press position
         this.end = null;   // Mouse drag position
-        this.maxPower = 100; // Max drag distance for power
-        this.powerScale = 0.005; // Tweak to set realistic shot strength
+        
+        // Constants adapted from your pool game for realistic power
+        this.maxPowerDist = 150; // The maximum distance the mouse can be dragged for power.
+        this.powerScale = 0.00035; // A scalar to convert drag distance to a reasonable physics force.
     }
 
     /**
      * Start aiming (on mousePressed)
-     * Only allow if all balls are stationary (handled in GameManager)
      * @param {p5.Vector} mousePos
      */
     startAiming(mousePos) {
@@ -35,30 +36,53 @@ class Cue {
     }
 
     /**
-     * Shoot the cue ball (on mouseReleased)
-     * Applies force based on drag direction/length
+     * Calculates and applies the force to the cue ball.
+     * This method is now self-contained.
      */
     shoot() {
-        if (this.aiming && this.end && this.start) {
-            let force = p5.Vector.sub(this.start, this.end);
-            let magnitude = constrain(force.mag(), 0, this.maxPower) * this.powerScale;
-            force.setMag(magnitude);
-            // Apply force to cue ball (Matter.js expects {x, y})
-            Matter.Body.applyForce(this.cueBall.body, this.cueBall.body.position, { x: force.x, y: force.y });
+        if (!this.aiming || !this.cueBall || !this.cueBall.body) {
             this.aiming = false;
-            this.start = null;
-            this.end = null;
+            return;
         }
+
+        // Calculate the force vector from the drag direction
+        let forceVector = p5.Vector.sub(this.start, this.end);
+        
+        // Constrain the drag distance to limit the power
+        let dragDistance = constrain(forceVector.mag(), 0, this.maxPowerDist);
+        
+        // Calculate the final force magnitude
+        let forceMagnitude = dragDistance * this.powerScale;
+        forceVector.setMag(forceMagnitude);
+
+        // Apply the force to the cue ball
+        Matter.Body.applyForce(this.cueBall.body, this.cueBall.body.position, { x: forceVector.x, y: forceVector.y });
+        
+        // Reset aiming state
+        this.aiming = false;
+        this.start = null;
+        this.end = null;
     }
 
     /**
      * Draw the cue line while aiming
      */
     draw() {
-        if (this.aiming && this.start && this.end) {
-            stroke(255, 255, 0);
-            strokeWeight(3);
+        if (this.aiming && this.start && this.end && this.cueBall && this.cueBall.body) {
+            stroke(255, 255, 0, 200);
+            strokeWeight(2);
             line(this.cueBall.body.position.x, this.cueBall.body.position.y, this.end.x, this.end.y);
+            
+            // Draw a power indicator
+            let dragVec = p5.Vector.sub(this.start, this.end);
+            let power = constrain(dragVec.mag(), 0, this.maxPowerDist);
+            let powerPercent = (power / this.maxPowerDist) * 100;
+
+            noStroke();
+            fill(255);
+            textAlign(CENTER);
+            textSize(16);
+            text(`Power: ${powerPercent.toFixed(0)}%`, this.end.x, this.end.y - 20);
         }
     }
 }
