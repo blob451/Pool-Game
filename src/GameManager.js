@@ -1,6 +1,6 @@
 // src/GameManager.js
 /**
- * Phase 4, Step 4: Implements the endgame color sequence.
+ * Phase 5, Step 2: Implements end-of-frame logic and game restart.
  */
 class GameManager {
     constructor() {
@@ -51,6 +51,10 @@ class GameManager {
         this.colorSequence = ['yellow', 'green', 'brown', 'blue', 'pink', 'black'];
         this.endgameColorIndex = 0;
 
+        // UI
+        this.nominationButtons = [];
+        this.createNominationButtons();
+        this.newFrameButton = { x: 30, y: 60, width: 120, height: 40, label: 'New Frame' };
 
         // BALLS & CUE
         this.balls = [];
@@ -61,10 +65,26 @@ class GameManager {
         // SCORING
         this.scoring = new Scoring();
     }
+    
+    createNominationButtons() {
+        const buttonWidth = 100;
+        const buttonHeight = 40;
+        const startX = (width / 2) - (this.colorSequence.length * (buttonWidth + 10) / 2);
+        const yPos = 40;
 
-    /**
-     * Initialize all snooker balls in their correct starting positions.
-     */
+        this.colorSequence.forEach((color, index) => {
+            this.nominationButtons.push({
+                x: startX + index * (buttonWidth + 10),
+                y: yPos,
+                width: buttonWidth,
+                height: buttonHeight,
+                colorName: color,
+                label: color.toUpperCase(),
+                fill: Ball.resolveColor('color', color)
+            });
+        });
+    }
+
     setupBalls() {
         const baulkLineX = this.TABLE_LEFT_X + (this.TABLE_WIDTH / 5);
         const cueBallX = this.TABLE_LEFT_X + (this.TABLE_WIDTH / 6);
@@ -95,9 +115,6 @@ class GameManager {
         }
     }
 
-    /**
-     * Main update loop - the state machine.
-     */
     update() {
         if (this.gameState === 'BALLS_MOVING') {
             this.checkPockets();
@@ -129,43 +146,116 @@ class GameManager {
             ball.show();
         }
         this.cue.draw();
+        this.drawNewFrameButton();
 
-        // UI text for debugging "ball on"
-        fill(255);
-        textSize(22);
-        textAlign(CENTER, TOP);
-        text(`Ball On: ${this.ballOn.toUpperCase()}`, width / 2, 16);
+        if (this.gameState === 'AWAITING_NOMINATION') {
+            this.drawNominationUI();
+        } else {
+            fill(255);
+            textSize(22);
+            textAlign(CENTER, TOP);
+            text(`Ball On: ${this.ballOn.toUpperCase()}`, width / 2, 16);
+        }
 
         if (this.gameOver) {
-            fill(255);
-            textSize(36);
-            textAlign(CENTER, CENTER);
-            text('Game Over!', width / 2, height / 2);
-            textAlign(LEFT, TOP);
+            this.drawGameOverUI();
         }
     }
 
-    handleInput(eventType) {
-        if (this.gameState !== 'AWAITING_SHOT' || this.gameOver) return;
+    drawNominationUI() {
+        fill(255);
+        textSize(26);
+        textAlign(CENTER, TOP);
+        text('Nominate a Color', width / 2, 10);
 
+        for (const btn of this.nominationButtons) {
+            fill(btn.fill);
+            stroke(255);
+            strokeWeight(2);
+            rect(btn.x, btn.y, btn.width, btn.height, 5);
+            
+            fill(0);
+            noStroke();
+            textSize(18);
+            textAlign(CENTER, CENTER);
+            text(btn.label, btn.x + btn.width / 2, btn.y + btn.height / 2);
+        }
+    }
+
+    drawNewFrameButton() {
+        const btn = this.newFrameButton;
+        fill(200, 220, 255);
+        stroke(100);
+        strokeWeight(1);
+        rect(btn.x, btn.y, btn.width, btn.height, 5);
+
+        fill(0);
+        noStroke();
+        textSize(18);
+        textAlign(CENTER, CENTER);
+        text(btn.label, btn.x + btn.width / 2, btn.y + btn.height / 2);
+    }
+    
+    drawGameOverUI() {
+        fill(0, 0, 0, 180);
+        rect(width/2, height/2, 400, 200, 10);
+
+        const score1 = this.scoring.getScore(0);
+        const score2 = this.scoring.getScore(1);
+        const winner = score1 > score2 ? 'Player 1 Wins!' : 'Player 2 Wins!';
+        
+        fill(255);
+        textSize(36);
+        textAlign(CENTER, CENTER);
+        text('Frame Over', width / 2, height / 2 - 40);
+        
+        textSize(28);
+        text(winner, width / 2, height / 2 + 10);
+    }
+
+    handleInput(eventType) {
         if (eventType === 'mousePressed') {
-            this.cue.startAiming(createVector(mouseX, mouseY));
-        } else if (eventType === 'mouseDragged') {
-            this.cue.updateAiming(createVector(mouseX, mouseY));
-        } else if (eventType === 'mouseReleased') {
-            if (this.cue.aiming) {
-                this.firstContact = null; 
-                this.turnEndedByFoul = false;
-                this.potMadeThisTurn = [];
-                this.cue.shoot();
-                this.gameState = 'BALLS_MOVING';
+            // New Frame button can be clicked at any time
+            const btn = this.newFrameButton;
+            if (mouseX > btn.x && mouseX < btn.x + btn.width && mouseY > btn.y && mouseY < btn.y + btn.height) {
+                this.reset();
+                return;
+            }
+        }
+        
+        if (this.gameOver) return;
+
+        if (this.gameState === 'AWAITING_SHOT') {
+            if (eventType === 'mousePressed') {
+                this.cue.startAiming(createVector(mouseX, mouseY));
+            } else if (eventType === 'mouseDragged') {
+                this.cue.updateAiming(createVector(mouseX, mouseY));
+            } else if (eventType === 'mouseReleased') {
+                if (this.cue.aiming) {
+                    this.firstContact = null; 
+                    this.turnEndedByFoul = false;
+                    this.potMadeThisTurn = [];
+                    this.cue.shoot();
+                    this.gameState = 'BALLS_MOVING';
+                }
+            }
+        } else if (this.gameState === 'AWAITING_NOMINATION' && eventType === 'mousePressed') {
+            this.handleNominationClick(mouseX, mouseY);
+        }
+    }
+    
+    handleNominationClick(mx, my) {
+        for (const btn of this.nominationButtons) {
+            if (mx > btn.x && mx < btn.x + btn.width && my > btn.y && my < btn.y + btn.height) {
+                this.ballOn = btn.colorName;
+                this.gameState = 'AWAITING_SHOT';
+                break;
             }
         }
     }
 
     handleCollisions(event) {
         if (this.firstContact) return;
-
         for (const pair of event.pairs) {
             let otherBody = null;
             if (this.cueBall && pair.bodyA === this.cueBall.body) {
@@ -176,7 +266,6 @@ class GameManager {
 
             if (otherBody) {
                 if (otherBody.label === 'table_boundary') continue;
-
                 const hitBall = this.balls.find(b => b.body === otherBody);
                 if (hitBall) {
                     this.firstContact = hitBall;
@@ -188,17 +277,25 @@ class GameManager {
 
     handleTurnEndLogic() {
         this.checkForFouls();
-        
         let legalPotMade = this.checkLegalPots();
         
-        // Check if reds are finished to start the endgame
         if (!this.endgamePhase && !this.areRedsRemaining()) {
             this.endgamePhase = true;
             this.ballOn = this.colorSequence[this.endgameColorIndex];
         }
 
+        const score1 = this.scoring.getScore(0);
+        const score2 = this.scoring.getScore(1);
+        const pointsLeft = this.calculatePointsRemaining();
+        if (Math.abs(score1 - score2) > pointsLeft) {
+            this.gameOver = true;
+        }
+
         if (this.turnEndedByFoul || !legalPotMade) {
             this.switchPlayer();
+        } else if (legalPotMade && this.ballOn === 'color') {
+            this.gameState = 'AWAITING_NOMINATION';
+            return;
         }
 
         if (this.cueBallNeedsRespotted) {
@@ -216,24 +313,27 @@ class GameManager {
             return;
         }
         
+        const isColorNominated = this.colorSequence.includes(this.ballOn);
+        
         if (this.endgamePhase) {
             if (this.firstContact.type !== 'color' || this.firstContact.color !== this.ballOn) {
                 this.commitFoul(`Hit a ${this.firstContact.color} ball when the ${this.ballOn} was on`, this.firstContact.value);
             }
-        } else {
-            if (this.ballOn === 'red' && this.firstContact.type !== 'red') {
-                this.commitFoul(`Hit a ${this.firstContact.color} ball when a red was on`, this.firstContact.value);
-            } else if (this.ballOn === 'color' && this.firstContact.type !== 'color') {
-                this.commitFoul(`Hit a red ball when a color was on`, 4);
+        } else if (isColorNominated) {
+            if (this.firstContact.type !== 'color' || this.firstContact.color !== this.ballOn) {
+                this.commitFoul(`Hit a ${this.firstContact.color} ball when the ${this.ballOn} was on`, 4);
             }
+        } else if (this.ballOn === 'red' && this.firstContact.type !== 'red') {
+            this.commitFoul(`Hit a ${this.firstContact.color} ball when a red was on`, this.firstContact.value);
         }
     }
     
     checkLegalPots() {
         let legalPotMade = false;
-        if (this.potMadeThisTurn.length === 0) {
-            return false;
-        }
+        if (this.potMadeThisTurn.length === 0) return false;
+
+        const isColorNominated = this.colorSequence.includes(this.ballOn);
+        const pottedRed = this.potMadeThisTurn.find(b => b.type === 'red');
 
         if (this.endgamePhase) {
             const pottedTargetColor = this.potMadeThisTurn.find(b => b.type === 'color' && b.color === this.ballOn);
@@ -243,32 +343,28 @@ class GameManager {
                 if (this.endgameColorIndex < this.colorSequence.length) {
                     this.ballOn = this.colorSequence[this.endgameColorIndex];
                 } else {
-                    this.ballOn = 'none'; // Game over
                     this.gameOver = true;
                 }
             } else if (this.potMadeThisTurn.length > 0) {
                  this.commitFoul(`Potted the wrong color during the endgame`, 4);
             }
-        } else {
-            const pottedRed = this.potMadeThisTurn.find(b => b.type === 'red');
+        } else if (isColorNominated) {
+            const pottedNominatedColor = this.potMadeThisTurn.find(b => b.color === this.ballOn);
+            if (pottedNominatedColor) {
+                legalPotMade = true;
+                this.ballOn = 'red';
+            }
+            if (pottedRed) {
+                this.commitFoul(`Potted a red ball when a color was on`, 4);
+            }
+        } else if (this.ballOn === 'red') {
             const pottedColor = this.potMadeThisTurn.find(b => b.type === 'color');
-
-            if (this.ballOn === 'red') {
-                if (pottedRed) {
-                    legalPotMade = true;
-                    this.ballOn = 'color'; 
-                }
-                if (pottedColor) {
-                    this.commitFoul(`Potted a ${pottedColor.color} ball when a red was on`, pottedColor.value);
-                }
-            } else if (this.ballOn === 'color') {
-                if (pottedColor) {
-                    legalPotMade = true;
-                    this.ballOn = 'red'; 
-                }
-                if (pottedRed) {
-                    this.commitFoul(`Potted a red ball when a color was on`, 4);
-                }
+            if (pottedRed) {
+                legalPotMade = true;
+                this.ballOn = 'color';
+            }
+            if (pottedColor) {
+                this.commitFoul(`Potted a ${pottedColor.color} ball when a red was on`, pottedColor.value);
             }
         }
         
@@ -294,12 +390,9 @@ class GameManager {
                         this.handleCueBallPocketed();
                     } else {
                         Matter.Body.setVelocity(ball.body, { x: 0, y: 0 });
-                        
-                        this.scoring.addPoints(this.currentPlayer, ball.value, `${ball.type} potted`);
                         this.potMadeThisTurn.push(ball); 
                         
                         ball.remove();
-                        // Only add to re-spot list if it's NOT the endgame
                         if (ball.type === 'color' && !this.endgamePhase) {
                             this.pottedColorsThisTurn.push(ball);
                         }
@@ -383,13 +476,21 @@ class GameManager {
         if (!this.endgamePhase) {
             this.ballOn = 'red';
         } else {
-            // In the endgame, the 'ball on' doesn't change when players switch
             this.ballOn = this.colorSequence[this.endgameColorIndex];
         }
     }
     
     areRedsRemaining() {
         return this.balls.some(ball => ball.type === 'red');
+    }
+
+    calculatePointsRemaining() {
+        return this.balls.reduce((sum, ball) => {
+            if (ball.type !== 'cue') {
+                return sum + ball.value;
+            }
+            return sum;
+        }, 0);
     }
 
     reset() {
