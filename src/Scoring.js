@@ -1,13 +1,26 @@
 // src/Scoring.js
 /**
- * Handles scoring and foul logic. This version includes logic to process a turn's score
- * only after all events (pots, fouls) have been registered.
+ * Handles scoring and foul logic for snooker. This version includes
+ * a helper function to get the value of each colored ball.
  */
 class Scoring {
     constructor(numPlayers = 2) {
         this.scores = new Array(numPlayers).fill(0);
         this.foulHistory = [];
         this.potHistory = [];
+        this.ballValues = {
+            'red': 1, 'yellow': 2, 'green': 3, 'brown': 4,
+            'blue': 5, 'pink': 6, 'black': 7
+        };
+    }
+
+    /**
+     * Returns the point value for a given ball color name.
+     * @param {string} colorName - The name of the color (e.g., 'blue').
+     * @returns {number} The point value of the ball.
+     */
+    getBallValue(colorName) {
+        return this.ballValues[colorName] || 0;
     }
 
     /**
@@ -17,13 +30,11 @@ class Scoring {
      * @param {boolean} wasFoulCommitted - True if a foul occurred on the shot.
      */
     processTurn(pottedBalls, playerIdx, wasFoulCommitted) {
-        // If a foul was committed, no points are awarded for any potted balls.
         if (wasFoulCommitted) {
             return;
         }
-
         for (const ball of pottedBalls) {
-            this.addPoints(playerIdx, ball.value, `${ball.color || ball.type} potted`);
+            this.addPoints(playerIdx, ball.value, `${ball.colorName || ball.type} potted`);
         }
     }
 
