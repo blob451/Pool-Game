@@ -1,6 +1,6 @@
 // src/Table.js
 /**
- * This version adds the missing isInPlayingArea helper function and refines boundaries.
+ * This version adds the missing isInPlayingArea helper function to prevent crashes.
  */
 class Table {
     constructor() {
