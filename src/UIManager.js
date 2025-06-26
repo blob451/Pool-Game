@@ -1,6 +1,6 @@
 // src/UIManager.js
 /**
- * This version adds UI elements for the Instant Replay system.
+ * This version adjusts the UI layout, placing extension buttons next to mode buttons.
  */
 class UIManager {
     constructor(gameManager) {
@@ -9,14 +9,15 @@ class UIManager {
         // UI element properties
         this.nominationButtons = [];
         this.modeButtons = [];
-        // [REPLAY] Add replay button property
         this.replayButton = null;
+        this.saveGhostButton = null;
+        this.clearGhostButton = null;
 
         // Create all UI elements
         this.createNominationButtons();
+        // The order is important here: create mode buttons first to get their position.
         this.createModeButtons();
-        // [REPLAY] Create the replay button
-        this.createReplayButton();
+        this.createReplayButtons(); // This now creates all extension buttons
         
         // Animation properties
         this.pocketAnimations = [];
@@ -56,20 +57,36 @@ class UIManager {
         ];
     }
 
-    // [REPLAY] Creates the Instant Replay button
-    createReplayButton() {
+    // This function now creates all extension-related buttons in a new column.
+    createReplayButtons() {
         const buttonWidth = 200;
         const buttonHeight = 40;
-        const startX = width - buttonWidth - 30;
-        // Place it below the existing mode buttons
-        const startY = 30 + (buttonHeight + 10) * 3; 
+        const spacing = 10;
+        // Position the new column to the left of the mode buttons
+        const startX = this.modeButtons[0].x - buttonWidth - spacing; 
 
         this.replayButton = {
             x: startX,
-            y: startY,
+            y: this.modeButtons[0].y, // Align with top mode button
             width: buttonWidth,
             height: buttonHeight,
             label: 'Instant Replay'
+        };
+        
+        this.saveGhostButton = {
+            x: startX,
+            y: this.modeButtons[1].y, // Align with middle mode button
+            width: buttonWidth,
+            height: buttonHeight,
+            label: 'Ghost Replay'
+        };
+
+        this.clearGhostButton = {
+            x: startX,
+            y: this.modeButtons[2].y, // Align with bottom mode button
+            width: buttonWidth,
+            height: buttonHeight,
+            label: 'Clear Ghost'
         };
     }
 
@@ -82,7 +99,6 @@ class UIManager {
         this.drawCollisionLog();
         this.drawModeButtons();
         this.drawInfoPanel();
-        // [REPLAY] Draw replay-related UI elements
         this.drawReplayUI();
 
         if (this.gameManager.gameState === 'BALL_IN_HAND') {
@@ -121,7 +137,6 @@ class UIManager {
         const startY = 30;
         const lineHeight = 30;
 
-        // Player 1
         fill(255);
         textSize(22 + this.p1ScoreAnim);
         textAlign(LEFT, TOP);
@@ -132,7 +147,6 @@ class UIManager {
             ellipse(startX - 15, startY + 12, 10, 10);
         }
 
-        // Player 2
         fill(255);
         textSize(22 + this.p2ScoreAnim);
         text('Player 2', startX, startY + lineHeight);
@@ -155,10 +169,7 @@ class UIManager {
     }
 
     drawCollisionLog() {
-        if (this.gameManager.collisionLog.length === 0) {
-            return;
-        }
-
+        if (this.gameManager.collisionLog.length === 0) return;
         push();
         const startX = 30;
         const yPos = 30 + 30 + 35; 
@@ -303,19 +314,15 @@ class UIManager {
         pop();
     }
 
-    // [REPLAY] Draws the replay button or the replay overlay.
     drawReplayUI() {
         const replayManager = this.gameManager.replayManager;
         if (!replayManager) return;
 
         push();
+        rectMode(CORNER);
+        textAlign(CENTER, CENTER);
 
-        // Draw the replay button if a replay is available
-        if (replayManager.state === 'IDLE' && replayManager.replayData.length > 0) {
-            const btn = this.replayButton;
-            rectMode(CORNER);
-            textAlign(CENTER, CENTER);
-            
+        const drawStyledButton = (btn) => {
             fill(200, 220, 255, 200);
             stroke(100);
             strokeWeight(1);
@@ -325,14 +332,21 @@ class UIManager {
             noStroke();
             textSize(16);
             text(btn.label, btn.x + btn.width / 2, btn.y + btn.height / 2);
+        };
+        
+        if (replayManager.state === 'IDLE' && replayManager.replayData.length > 0) {
+            drawStyledButton(this.replayButton);
+            drawStyledButton(this.saveGhostButton);
         }
 
-        // Draw the overlay if a replay is in progress
+        if (replayManager.ghostData) {
+            drawStyledButton(this.clearGhostButton);
+        }
+
         if (replayManager.state === 'REPLAYING') {
             fill(0, 0, 0, 150);
-            rectMode(CORNER);
             noStroke();
-            rect(0, 0, width, height); // Darken the screen
+            rect(0, 0, width, height);
             
             fill(255);
             textSize(32);
@@ -363,13 +377,28 @@ class UIManager {
     }
     
     handleInput(mx, my) {
-        // [REPLAY] Handle replay button click first
         const replayManager = this.gameManager.replayManager;
-        if (replayManager && replayManager.state === 'IDLE' && replayManager.replayData.length > 0) {
-            const btn = this.replayButton;
-            if (mx > btn.x && mx < btn.x + btn.width && my > btn.y && my < btn.y + btn.height) {
-                replayManager.startReplay();
-                return true; // Input handled
+        if (replayManager && replayManager.state === 'IDLE') {
+            if (replayManager.replayData.length > 0) {
+                const replayBtn = this.replayButton;
+                if (mx > replayBtn.x && mx < replayBtn.x + replayBtn.width && my > replayBtn.y && my < replayBtn.y + replayBtn.height) {
+                    replayManager.startReplay();
+                    return true;
+                }
+                
+                const saveBtn = this.saveGhostButton;
+                if (mx > saveBtn.x && mx < saveBtn.x + saveBtn.width && my > saveBtn.y && my < saveBtn.y + saveBtn.height) {
+                    replayManager.saveAsGhost();
+                    return true;
+                }
+            }
+            
+            if (replayManager.ghostData) {
+                const clearBtn = this.clearGhostButton;
+                if (mx > clearBtn.x && mx < clearBtn.x + clearBtn.width && my > clearBtn.y && my < clearBtn.y + clearBtn.height) {
+                    replayManager.clearGhost();
+                    return true;
+                }
             }
         }
 

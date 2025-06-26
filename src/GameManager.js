@@ -1,6 +1,6 @@
 // src/GameManager.js
 /**
- * This version integrates the core ReplayManager for recording shots.
+ * This version integrates the full Replay and Ghost Shot system.
  */
 class GameManager {
     constructor() {
@@ -15,7 +15,6 @@ class GameManager {
         Matter.Runner.run(runner, this.engine);
         
         Matter.Events.on(this.engine, 'collisionStart', (event) => { this.handleCollisions(event); });
-        // [REPLAY] Add an afterUpdate listener to record every physics frame.
         Matter.Events.on(this.engine, 'afterUpdate', () => {
             if (this.replayManager) {
                 this.replayManager.recordFrame();
@@ -27,7 +26,6 @@ class GameManager {
         this.table = new Table();
         this.scoring = new Scoring();
         this.uiManager = new UIManager(this);
-        // [REPLAY] Instantiate the ReplayManager.
         this.replayManager = new ReplayManager(this);
 
         // CONSTANTS
@@ -169,10 +167,11 @@ class GameManager {
     // --- CORE GAME LOOP ---
 
     update() {
-        // [REPLAY] If we are replaying, let the ReplayManager handle updates and skip all game logic/physics.
+        // Let the ReplayManager handle its own state updates (e.g., for ghost animation timing).
+        this.replayManager.update();
+
         if (this.replayManager.state === 'REPLAYING') {
-            this.replayManager.update();
-            return;
+            return; // Skip all game logic/physics during replay
         }
 
         if (this.foulMessageTimer > 0) this.foulMessageTimer--;
@@ -198,16 +197,19 @@ class GameManager {
     }
 
     draw() {
-        // [REPLAY] If we are replaying, draw the replay frame and skip all normal drawing.
         if (this.replayManager.state === 'REPLAYING') {
             this.table.draw();
             this.replayManager.draw();
-            return;
+            // The UI draw call is now placed outside this block to show the overlay
+        } else {
+            this.table.draw();
+            for (let ball of this.balls) ball.show();
+            // [GHOST] Render the ghost shot overlay on top of the live balls.
+            this.replayManager.drawGhost();
+            this.cue.draw();
         }
 
-        this.table.draw();
-        for (let ball of this.balls) ball.show();
-        this.cue.draw();
+        // Draw the UI on top of everything, including replays (for the overlay).
         this.uiManager.draw();
     }
 
@@ -222,7 +224,6 @@ class GameManager {
             else if (eventType === 'mouseDragged') this.cue.updateAiming(createVector(mouseX, mouseY));
             else if (eventType === 'mouseReleased' && this.cue.aiming) {
                 this.firstContact = null; this.turnEndedByFoul = false; this.potMadeThisTurn = []; this.collisionLog = [];
-                // [REPLAY] Start recording the shot right before it's taken.
                 this.replayManager.startRecording();
                 this.cue.shoot(); 
                 this.gameState = 'BALLS_MOVING';
@@ -248,14 +249,12 @@ class GameManager {
                 if (otherBody.label === 'table_boundary') {
                     if (!lastCollision || lastCollision.type !== 'cushion') {
                         logEntry = { type: 'cushion' };
-                        console.log(`Cue Ball Collision: Cushion`);
                     }
                 } else {
                     const hitBall = this.balls.find(b => b.body === otherBody);
                     if (hitBall) {
                         if (!this.firstContact) this.firstContact = hitBall;
                         logEntry = { type: 'ball', color: hitBall.color };
-                        console.log(`Cue Ball Collision: ${hitBall.colorName || 'Red'}`);
                     }
                 }
                 if (logEntry) this.collisionLog.push(logEntry);
@@ -266,7 +265,6 @@ class GameManager {
     // --- TURN AND RULE LOGIC ---
 
     handleTurnEndLogic() {
-        // [REPLAY] Stop recording now that the turn's action has concluded.
         this.replayManager.stopRecording();
         
         this.checkForFouls();
