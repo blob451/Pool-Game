@@ -1,6 +1,6 @@
 // src/UIManager.js
 /**
- * This version uses push() and pop() to ensure proper style isolation for all UI elements.
+ * This version implements a central information panel for all game state messages.
  */
 class UIManager {
     constructor(gameManager) {
@@ -18,7 +18,7 @@ class UIManager {
         const buttonWidth = 100;
         const buttonHeight = 40;
         const startX = (width / 2) - (colorSequence.length * (buttonWidth + 10) / 2);
-        const yPos = 40;
+        const yPos = 80; // Lowered to make space for the info panel
 
         colorSequence.forEach((color, index) => {
             this.nominationButtons.push({
@@ -39,12 +39,7 @@ class UIManager {
     draw() {
         this.drawScoreboard();
         this.drawNewFrameButton();
-
-        if (this.gameManager.gameState === 'AWAITING_NOMINATION') {
-            this.drawNominationUI();
-        }
-
-        this.drawFoulMessage();
+        this.drawInfoPanel(); // Centralized info display
 
         if (this.gameManager.gameOver) {
             this.drawGameOverUI();
@@ -85,42 +80,70 @@ class UIManager {
             textSize(20);
             text(`Break: ${this.gameManager.currentBreak}`, startX, startY + lineHeight * 2);
         }
-
-        // Central "Ball On" display (unless nominating)
-        if (this.gameManager.gameState === 'AWAITING_SHOT') {
-            fill(255);
-            textSize(22);
-            textAlign(CENTER, TOP);
-            text(`Ball On: ${this.gameManager.ballOn.toUpperCase()}`, width / 2, 20);
-        }
         pop();
     }
 
-    drawNominationUI() {
-        push(); // Isolate nomination UI styles
-        fill(255);
-        textSize(26);
+    /**
+     * Draws the main information panel at the top of the screen.
+     */
+    drawInfoPanel() {
+        push();
         textAlign(CENTER, TOP);
-        text('Nominate a Color', width / 2, 20);
         
+        let infoText = "";
+        let textColor = color(255);
+
+        // Determine what text to show based on game state
+        if (this.gameManager.foulMessageTimer > 0) {
+            infoText = this.gameManager.foulMessage;
+            textColor = color(255, 80, 80);
+        } else if (this.gameManager.gameState === 'AWAITING_NOMINATION') {
+            infoText = 'Nominate a Color';
+            this.drawNominationButtons(); // Draw buttons only when needed
+        } else if (this.gameManager.gameState === 'AWAITING_SHOT') {
+            infoText = `Ball On: ${this.gameManager.ballOn.toUpperCase()}`;
+        }
+
+        // Draw the panel background and text
+        if (infoText) {
+            const panelWidth = 450;
+            const panelHeight = 40;
+            const panelX = width / 2;
+            const panelY = 20;
+
+            fill(0, 0, 0, 150);
+            noStroke();
+            rectMode(CENTER);
+            rect(panelX, panelY + panelHeight / 2, panelWidth, panelHeight, 5);
+
+            fill(textColor);
+            textSize(24);
+            textAlign(CENTER, CENTER);
+            text(infoText, panelX, panelY + panelHeight / 2);
+        }
+        pop();
+    }
+    
+    drawNominationButtons() {
+        push();
         rectMode(CORNER);
         for (const btn of this.nominationButtons) {
             fill(btn.fill);
             stroke(255);
             strokeWeight(2);
-            rect(btn.x, btn.y + 40, btn.width, btn.height, 5);
+            rect(btn.x, btn.y, btn.width, btn.height, 5);
             
             fill(0);
             noStroke();
             textSize(18);
             textAlign(CENTER, CENTER);
-            text(btn.label, btn.x + btn.width / 2, btn.y + 40 + btn.height / 2);
+            text(btn.label, btn.x + btn.width / 2, btn.y + btn.height / 2);
         }
         pop();
     }
 
     drawNewFrameButton() {
-        push(); // Isolate button styles
+        push();
         const btn = this.newFrameButton;
         rectMode(CORNER);
         
@@ -138,7 +161,7 @@ class UIManager {
     }
     
     drawGameOverUI() {
-        push(); // Isolate game over styles
+        push();
         rectMode(CENTER);
         fill(0, 0, 0, 180);
         rect(width/2, height/2, 400, 200, 10);
@@ -157,19 +180,6 @@ class UIManager {
         pop();
     }
     
-    drawFoulMessage() {
-        push(); // Isolate foul message styles
-        if (this.gameManager.foulMessageTimer > 0) {
-            const alpha = min(255, this.gameManager.foulMessageTimer * 3);
-            fill(255, 60, 60, alpha);
-            noStroke();
-            textAlign(CENTER, CENTER);
-            textSize(32);
-            text(this.gameManager.foulMessage, width / 2, height / 2 - 150);
-        }
-        pop();
-    }
-    
     handleInput(mx, my) {
         const btn = this.newFrameButton;
         if (mx > btn.x && mx < btn.x + btn.width && my > btn.y && my < btn.y + btn.height) {
@@ -179,7 +189,7 @@ class UIManager {
 
         if (this.gameManager.gameState === 'AWAITING_NOMINATION') {
             for (const btn of this.nominationButtons) {
-                if (mx > btn.x && mx < btn.x + btn.width && my > btn.y + 40 && my < btn.y + 40 + btn.height) {
+                if (mx > btn.x && mx < btn.x + btn.width && my > btn.y && my < btn.y + btn.height) {
                     this.gameManager.handleNomination(btn.colorName);
                     return true;
                 }
