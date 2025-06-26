@@ -1,6 +1,6 @@
 // src/GameManager.js
 /**
- * This version implements the three game setup modes as required by the rubric.
+ * This version adds the final rubric requirement: a foul for potting two colors at once.
  */
 class GameManager {
     constructor() {
@@ -37,7 +37,7 @@ class GameManager {
         this.ghostCueBall = { x: 0, y: 0, isValid: false };
         this.cue = new Cue(null);
         
-        this.startNewMode(1); // Default to mode 1 on initial load
+        this.startNewMode(1);
     }
     
     // --- MODE SETUP LOGIC ---
@@ -107,7 +107,6 @@ class GameManager {
     }
 
     _setupRandomReds() {
-        // First, place colored balls on their spots
         const baulkLineX = this.TABLE_MIN_X + (this.TABLE_WIDTH / 5);
         const dRadius = this.table.dRadius;
         const tableCenterY = this.TABLE_Y;
@@ -129,7 +128,6 @@ class GameManager {
             this.balls.push(ball);
         });
         
-        // Add random reds
         for (let i = 0; i < 15; i++) {
             this._placeBallRandomly('red', 'red', 1);
         }
@@ -139,7 +137,7 @@ class GameManager {
         let position;
         let validPosition = false;
         let attempts = 0;
-        while (!validPosition && attempts < 100) { // Safety break
+        while (!validPosition && attempts < 100) { 
             position = {
                 x: random(this.TABLE_MIN_X + this.BALL_RADIUS, this.TABLE_MAX_X - this.BALL_RADIUS),
                 y: random(this.TABLE_MIN_Y + this.BALL_RADIUS, this.TABLE_MAX_Y - this.BALL_RADIUS),
@@ -165,7 +163,6 @@ class GameManager {
         if (this.foulMessageTimer > 0) this.foulMessageTimer--;
 
         if (this.gameState === 'BALLS_MOVING' && !this.cue.isShooting) {
-            // --- FIXED: Add speed limit to all balls to prevent tunneling ---
             for (const ball of this.balls) {
                 if (ball.body.speed > this.MAX_BALL_SPEED) {
                     Matter.Body.setVelocity(ball.body, {
@@ -297,6 +294,14 @@ class GameManager {
         let legalPotMade = false;
         if (this.potMadeThisTurn.length === 0) return false;
         const pottedRed = this.potMadeThisTurn.find(b => b.type === 'red');
+
+        // --- NEW: Foul for potting multiple colors ---
+        const pottedColors = this.potMadeThisTurn.filter(b => b.type === 'color');
+        if (pottedColors.length > 1) {
+            const highestValue = pottedColors.reduce((max, b) => Math.max(max, b.value), 0);
+            this.commitFoul("Potted more than one color", highestValue);
+            return false; // End check, it's a foul
+        }
 
         if (!this.turnEndedByFoul) this.potMadeThisTurn.forEach(p => this.currentBreak += p.value);
 
