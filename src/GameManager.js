@@ -1,6 +1,6 @@
 // src/GameManager.js
 /**
- * This version adds the final rubric requirement: a foul for potting two colors at once.
+ * This version integrates the core ReplayManager for recording shots.
  */
 class GameManager {
     constructor() {
@@ -15,11 +15,20 @@ class GameManager {
         Matter.Runner.run(runner, this.engine);
         
         Matter.Events.on(this.engine, 'collisionStart', (event) => { this.handleCollisions(event); });
+        // [REPLAY] Add an afterUpdate listener to record every physics frame.
+        Matter.Events.on(this.engine, 'afterUpdate', () => {
+            if (this.replayManager) {
+                this.replayManager.recordFrame();
+            }
+        });
+
         window.world = this.world;
         
         this.table = new Table();
         this.scoring = new Scoring();
         this.uiManager = new UIManager(this);
+        // [REPLAY] Instantiate the ReplayManager.
+        this.replayManager = new ReplayManager(this);
 
         // CONSTANTS
         this.TABLE_WIDTH = this.table.width;
@@ -160,6 +169,12 @@ class GameManager {
     // --- CORE GAME LOOP ---
 
     update() {
+        // [REPLAY] If we are replaying, let the ReplayManager handle updates and skip all game logic/physics.
+        if (this.replayManager.state === 'REPLAYING') {
+            this.replayManager.update();
+            return;
+        }
+
         if (this.foulMessageTimer > 0) this.foulMessageTimer--;
 
         if (this.gameState === 'BALLS_MOVING' && !this.cue.isShooting) {
@@ -183,6 +198,13 @@ class GameManager {
     }
 
     draw() {
+        // [REPLAY] If we are replaying, draw the replay frame and skip all normal drawing.
+        if (this.replayManager.state === 'REPLAYING') {
+            this.table.draw();
+            this.replayManager.draw();
+            return;
+        }
+
         this.table.draw();
         for (let ball of this.balls) ball.show();
         this.cue.draw();
@@ -200,7 +222,10 @@ class GameManager {
             else if (eventType === 'mouseDragged') this.cue.updateAiming(createVector(mouseX, mouseY));
             else if (eventType === 'mouseReleased' && this.cue.aiming) {
                 this.firstContact = null; this.turnEndedByFoul = false; this.potMadeThisTurn = []; this.collisionLog = [];
-                this.cue.shoot(); this.gameState = 'BALLS_MOVING';
+                // [REPLAY] Start recording the shot right before it's taken.
+                this.replayManager.startRecording();
+                this.cue.shoot(); 
+                this.gameState = 'BALLS_MOVING';
             }
         } else if (this.gameState === 'BALL_IN_HAND' && eventType === 'mousePressed' && this.ghostCueBall.isValid) {
             this.placeNewCueBall();
@@ -241,6 +266,9 @@ class GameManager {
     // --- TURN AND RULE LOGIC ---
 
     handleTurnEndLogic() {
+        // [REPLAY] Stop recording now that the turn's action has concluded.
+        this.replayManager.stopRecording();
+        
         this.checkForFouls();
         let legalPotMade = this.checkLegalPots();
         
@@ -295,12 +323,11 @@ class GameManager {
         if (this.potMadeThisTurn.length === 0) return false;
         const pottedRed = this.potMadeThisTurn.find(b => b.type === 'red');
 
-        // --- NEW: Foul for potting multiple colors ---
         const pottedColors = this.potMadeThisTurn.filter(b => b.type === 'color');
         if (pottedColors.length > 1) {
             const highestValue = pottedColors.reduce((max, b) => Math.max(max, b.value), 0);
             this.commitFoul("Potted more than one color", highestValue);
-            return false; // End check, it's a foul
+            return false;
         }
 
         if (!this.turnEndedByFoul) this.potMadeThisTurn.forEach(p => this.currentBreak += p.value);
