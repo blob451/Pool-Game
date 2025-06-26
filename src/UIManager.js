@@ -1,6 +1,6 @@
 // src/UIManager.js
 /**
- * This version replaces the "New Frame" button with a unified set of game mode buttons.
+ * This version adds UI elements for the Instant Replay system.
  */
 class UIManager {
     constructor(gameManager) {
@@ -8,17 +8,20 @@ class UIManager {
 
         // UI element properties
         this.nominationButtons = [];
-        
-        // --- NEW: Replaces the old newFrameButton ---
         this.modeButtons = [];
+        // [REPLAY] Add replay button property
+        this.replayButton = null;
+
+        // Create all UI elements
+        this.createNominationButtons();
         this.createModeButtons();
+        // [REPLAY] Create the replay button
+        this.createReplayButton();
         
         // Animation properties
         this.pocketAnimations = [];
         this.p1ScoreAnim = 0;
         this.p2ScoreAnim = 0;
-
-        this.createNominationButtons();
     }
 
     createNominationButtons() {
@@ -53,6 +56,23 @@ class UIManager {
         ];
     }
 
+    // [REPLAY] Creates the Instant Replay button
+    createReplayButton() {
+        const buttonWidth = 200;
+        const buttonHeight = 40;
+        const startX = width - buttonWidth - 30;
+        // Place it below the existing mode buttons
+        const startY = 30 + (buttonHeight + 10) * 3; 
+
+        this.replayButton = {
+            x: startX,
+            y: startY,
+            width: buttonWidth,
+            height: buttonHeight,
+            label: 'Instant Replay'
+        };
+    }
+
     /**
      * Main draw call for the entire UI.
      */
@@ -62,6 +82,8 @@ class UIManager {
         this.drawCollisionLog();
         this.drawModeButtons();
         this.drawInfoPanel();
+        // [REPLAY] Draw replay-related UI elements
+        this.drawReplayUI();
 
         if (this.gameManager.gameState === 'BALL_IN_HAND') {
             this.drawBallInHandUI();
@@ -280,6 +302,48 @@ class UIManager {
         }
         pop();
     }
+
+    // [REPLAY] Draws the replay button or the replay overlay.
+    drawReplayUI() {
+        const replayManager = this.gameManager.replayManager;
+        if (!replayManager) return;
+
+        push();
+
+        // Draw the replay button if a replay is available
+        if (replayManager.state === 'IDLE' && replayManager.replayData.length > 0) {
+            const btn = this.replayButton;
+            rectMode(CORNER);
+            textAlign(CENTER, CENTER);
+            
+            fill(200, 220, 255, 200);
+            stroke(100);
+            strokeWeight(1);
+            rect(btn.x, btn.y, btn.width, btn.height, 5);
+            
+            fill(0);
+            noStroke();
+            textSize(16);
+            text(btn.label, btn.x + btn.width / 2, btn.y + btn.height / 2);
+        }
+
+        // Draw the overlay if a replay is in progress
+        if (replayManager.state === 'REPLAYING') {
+            fill(0, 0, 0, 150);
+            rectMode(CORNER);
+            noStroke();
+            rect(0, 0, width, height); // Darken the screen
+            
+            fill(255);
+            textSize(32);
+            textAlign(CENTER, TOP);
+            text('REPLAY MODE', width / 2, 20);
+            
+            textSize(18);
+            text('Press any key to exit', width / 2, 60);
+        }
+        pop();
+    }
     
     drawGameOverUI() {
         push();
@@ -299,6 +363,16 @@ class UIManager {
     }
     
     handleInput(mx, my) {
+        // [REPLAY] Handle replay button click first
+        const replayManager = this.gameManager.replayManager;
+        if (replayManager && replayManager.state === 'IDLE' && replayManager.replayData.length > 0) {
+            const btn = this.replayButton;
+            if (mx > btn.x && mx < btn.x + btn.width && my > btn.y && my < btn.y + btn.height) {
+                replayManager.startReplay();
+                return true; // Input handled
+            }
+        }
+
         for (const btn of this.modeButtons) {
             if (mx > btn.x && mx < btn.x + btn.width && my > btn.y && my < btn.y + btn.height) {
                 this.gameManager.startNewMode(btn.mode);

@@ -1,6 +1,6 @@
 // src/main.js
 /**
- * p5.js entry point. Includes keyPressed() for mode switching.
+ * p5.js entry point. Includes keyPressed() for mode switching and replay exit.
  */
 let gameManager;
 
@@ -16,6 +16,12 @@ function draw() {
 }
 
 function keyPressed() {
+    // [REPLAY] If in replay mode, any key press will stop the replay.
+    if (gameManager && gameManager.replayManager.state === 'REPLAYING') {
+        gameManager.replayManager.stopReplay();
+        return; // Prevent other key actions during replay.
+    }
+
     if (key === '1') {
         console.log("Starting Mode 1: Standard Layout");
         gameManager.startNewMode(1);
