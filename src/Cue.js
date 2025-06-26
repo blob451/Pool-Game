@@ -1,50 +1,42 @@
 // src/Cue.js
 /**
  * Handles cue aiming, visual feedback, and shooting logic.
- * This version renders a full, stylized cue stick for aiming, with an improved, more realistic design.
+ * This version includes a realistic cue stick and a dynamic, graphical power bar.
  */
 class Cue {
     constructor(cueBall) {
-        this.cueBall = cueBall; // Reference to cue ball object
+        this.cueBall = cueBall;
         this.aiming = false;
-        this.start = null; // Mouse press position
-        this.end = null;   // Mouse drag position
+        this.start = null;
+        this.end = null;
         
-        // Constants for power calculation
         this.maxPowerDist = 150;
-        this.powerScale = 0.00035;
+        this.powerScale = 0.0001;
 
-        // Constants for cue appearance
-        this.cueLength = 380; // Slightly longer for a more professional look
+        this.cueLength = 380;
         this.cueButtWidth = 14;
         this.cueShaftWidth = 9;
         this.cueTipWidth = 7;
-        this.cuePullback = 10; // The small gap between cue tip and ball
+        this.cuePullback = 10;
+
+        // Power bar colors
+        this.powerColorLow = color(67, 160, 71);   // Green
+        this.powerColorMid = color(253, 216, 53);  // Yellow
+        this.powerColorHigh = color(211, 47, 47);   // Red
     }
 
-    /**
-     * Start aiming (on mousePressed)
-     * @param {p5.Vector} mousePos
-     */
     startAiming(mousePos) {
         this.aiming = true;
         this.start = mousePos.copy();
         this.end = mousePos.copy();
     }
 
-    /**
-     * Update aim position (on mouseDragged)
-     * @param {p5.Vector} mousePos
-     */
     updateAiming(mousePos) {
         if (this.aiming) {
             this.end = mousePos.copy();
         }
     }
 
-    /**
-     * Calculates and applies the force to the cue ball.
-     */
     shoot() {
         if (!this.aiming || !this.cueBall || !this.cueBall.body) {
             this.aiming = false;
@@ -53,7 +45,7 @@ class Cue {
 
         let forceVector = p5.Vector.sub(this.start, this.end);
         let dragDistance = constrain(forceVector.mag(), 0, this.maxPowerDist);
-        let forceMagnitude = dragDistance * this.powerScale;
+        let forceMagnitude = dragDistance * this.powerScale * 2;
         forceVector.setMag(forceMagnitude);
 
         Matter.Body.applyForce(this.cueBall.body, this.cueBall.body.position, { x: forceVector.x, y: forceVector.y });
@@ -63,9 +55,6 @@ class Cue {
         this.end = null;
     }
 
-    /**
-     * Draw the stylized cue stick while aiming.
-     */
     draw() {
         if (!this.aiming || !this.start || !this.end || !this.cueBall || !this.cueBall.body) {
             return;
@@ -77,64 +66,90 @@ class Cue {
         const angle = dragVec.heading();
         
         const power = constrain(dragVec.mag(), 0, this.maxPowerDist);
-        const powerPercent = (power / this.maxPowerDist) * 100;
+        const powerPercent = power / this.maxPowerDist;
         const pullBack = map(power, 0, this.maxPowerDist, 0, this.maxPowerDist * 0.6);
 
-        push(); // Start isolated drawing state
+        push();
         translate(cueBallPos.x, cueBallPos.y);
         rotate(angle);
 
         const cueStart = -this.cuePullback - pullBack;
-        const jointPosition = cueStart - this.cueLength * 0.75; // 3/4 joint position
+        const jointPosition = cueStart - this.cueLength * 0.75;
 
-        // 1. Cue Shadow
+        // --- Draw Cue Stick ---
+        // Shadow
         stroke(10, 5, 0, 90);
         strokeWeight(this.cueButtWidth + 4);
         strokeCap(ROUND);
         line(cueStart - this.cueLength + 5, 5, cueStart + 5, 5);
         
-        // 2. Main Butt (darker, rich wood like ebony)
-        stroke(45, 35, 25); // Dark ebony/rosewood color
+        // Butt
+        stroke(45, 35, 25);
         strokeWeight(this.cueButtWidth);
-        strokeCap(SQUARE); // Gives the butt end a flat appearance
+        strokeCap(SQUARE);
         line(cueStart - this.cueLength, 0, jointPosition, 0);
         
-        // 3. Brass Joint
-        stroke(181, 137, 0); // Brass color
-        strokeWeight(this.cueButtWidth + 1); // Slightly thicker to appear as a joint
+        // Brass Joint
+        stroke(181, 137, 0);
+        strokeWeight(this.cueButtWidth + 1);
         strokeCap(ROUND);
         line(jointPosition, 0, jointPosition + 4, 0);
 
-        // 4. Shaft (lighter ash wood)
-        stroke(224, 204, 169); // Ash wood color
+        // Shaft
+        stroke(224, 204, 169);
         strokeWeight(this.cueShaftWidth);
         line(jointPosition + 4, 0, cueStart - 5, 0);
         
-        // 5. Ferrule (white part before the tip)
+        // Ferrule
         stroke(245, 245, 240);
         strokeWeight(this.cueTipWidth);
         line(cueStart - 5, 0, cueStart, 0);
         
-        // 6. Tip (leathery blue/brown)
+        // Tip
         stroke(60, 90, 110);
         strokeWeight(this.cueTipWidth);
         point(cueStart, 0);
+
+        // --- Draw Power Bar ---
+        const powerBarYOffset = 35;
+        const powerBarLength = 180;
+        const powerBarHeight = 10;
+        const powerBarX = cueStart - this.cueLength;
+
+        // Power bar background
+        noStroke();
+        fill(0, 0, 0, 120);
+        rect(powerBarX, powerBarYOffset, powerBarLength, powerBarHeight, 5);
         
+        // Power bar fill
+        let currentPowerColor;
+        if (powerPercent <= 0.5) {
+            let amount = powerPercent * 2;
+            currentPowerColor = lerpColor(this.powerColorLow, this.powerColorMid, amount);
+        } else {
+            let amount = (powerPercent - 0.5) * 2;
+            currentPowerColor = lerpColor(this.powerColorMid, this.powerColorHigh, amount);
+        }
+        
+        fill(currentPowerColor);
+        rect(powerBarX, powerBarYOffset, powerBarLength * powerPercent, powerBarHeight, 5);
+        
+        // Power percentage text
+        noStroke();
+        fill(255, 220);
+        textSize(12);
+        textAlign(LEFT, CENTER);
+        text(`${(powerPercent * 100).toFixed(0)}%`, powerBarX + powerBarLength + 10, powerBarYOffset + powerBarHeight / 2);
+
         pop(); // Restore original drawing state
 
-        // Draw aiming line and power text
+        // --- Draw Aiming Guide Line ---
         push();
         stroke(255, 255, 255, 100);
         strokeWeight(1);
-        drawingContext.setLineDash([3, 5]); // Create a dashed line for the aiming guide
+        drawingContext.setLineDash([3, 5]);
         line(cueBallPos.x, cueBallPos.y, this.end.x, this.end.y);
-        drawingContext.setLineDash([]); // Reset to solid line
-
-        noStroke();
-        fill(255);
-        textAlign(CENTER);
-        textSize(16);
-        text(`Power: ${powerPercent.toFixed(0)}%`, this.end.x, this.end.y - 20);
+        drawingContext.setLineDash([]);
         pop();
     }
 }
