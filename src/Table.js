@@ -1,6 +1,6 @@
 // src/Table.js
 /**
- * This version adds logic to check if ball spots are occupied.
+ * This version uses push() and pop() in its main draw function for proper style isolation.
  */
 class Table {
     constructor() {
@@ -34,14 +34,14 @@ class Table {
         this.baulkLineX = this.playMinX + this.width / 5;
         this.dRadius = this.height / 6;
 
-        // Ball spots, in order of value for re-spotting
+        // Ball spots
         this.spots = {
             black: { x: this.playMinX + (this.width * 10 / 11), y: this.y },
             pink:  { x: this.playMinX + (this.width * 9 / 12), y: this.y },
             blue:  { x: this.x, y: this.y },
             brown: { x: this.baulkLineX, y: this.y },
-            green: { x: this.baulkLineX, y: this.y - this.dRadius },
             yellow:{ x: this.baulkLineX, y: this.y + this.dRadius },
+            green: { x: this.baulkLineX, y: this.y - this.dRadius },
         };
 
         // Pockets
@@ -69,12 +69,6 @@ class Table {
         );
     }
 
-    /**
-     * Checks if a given spot is occupied by any ball.
-     * @param {object} spotPosition - The {x, y} coordinates of the spot.
-     * @param {Ball[]} balls - The array of all balls on the table.
-     * @returns {boolean}
-     */
     isSpotOccupied(spotPosition, balls) {
         return balls.some(ball => 
             distance(ball.body.position.x, ball.body.position.y, spotPosition.x, spotPosition.y) < Ball.snookerRadius() * 2
@@ -82,6 +76,7 @@ class Table {
     }
 
     draw() {
+        push(); // Isolate all table drawing styles
         this.drawWood();
         this.drawWoodShadow();
         this.drawRails();
@@ -90,29 +85,36 @@ class Table {
         this.drawPockets();
         this.drawMarkings();
         this.drawSpots();
+        pop(); // Restore original styles
     }
 
     drawWood() {
-        fill(this.woodColor); noStroke();
+        fill(this.woodColor);
+        noStroke();
         rectMode(CENTER);
         rect(this.x, this.y, this.width + this.woodThickness * 2, this.height + this.woodThickness * 2, 8);
     }
 
     drawWoodShadow() {
-        noFill(); stroke(this.woodShadowColor); strokeWeight(18);
+        noFill();
+        stroke(this.woodShadowColor);
+        strokeWeight(18);
         rectMode(CENTER);
         rect(this.x, this.y, this.width + this.woodThickness * 2 - 24, this.height + this.woodThickness * 2 - 24, 8);
         noStroke();
     }
 
     drawRails() {
-        fill(this.railColor); noStroke();
+        fill(this.railColor);
+        noStroke();
         rectMode(CENTER);
         rect(this.x, this.y, this.width + this.railWidth * 2, this.height + this.railWidth * 2, 4);
     }
 
     drawFelt() {
-        fill(this.feltColor); rectMode(CENTER); noStroke();
+        fill(this.feltColor);
+        rectMode(CENTER);
+        noStroke();
         rect(this.x, this.y, this.width, this.height, 2);
         for (let i = 0; i < 8; i++) {
             fill(red(this.feltShadowColor), green(this.feltShadowColor), blue(this.feltShadowColor), 30 - i * 2);
@@ -122,24 +124,28 @@ class Table {
 
     drawPocketShadows() {
         for (let p of this.pockets) {
-            noStroke(); fill(0, 0, 0, 33);
+            noStroke();
+            fill(0, 0, 0, 33);
             ellipse(p.x, p.y, this.pocketRadius * 2.5);
         }
     }
 
     drawPockets() {
-        fill(10, 10, 10); noStroke();
+        fill(10, 10, 10);
+        noStroke();
         for (let p of this.pockets) {
             ellipse(p.x, p.y, this.pocketRadius * 2);
         }
     }
 
     drawMarkings() {
-        stroke(255); strokeWeight(2);
+        stroke(255);
+        strokeWeight(2);
         line(this.baulkLineX, this.playMinY, this.baulkLineX, this.playMaxY);
         noFill();
         arc(this.baulkLineX, this.y, this.dRadius * 2, this.dRadius * 2, HALF_PI, 3 * HALF_PI);
-        stroke(255, 140); strokeWeight(4);
+        stroke(255, 140);
+        strokeWeight(4);
         arc(this.baulkLineX, this.y, this.dRadius * 2, this.dRadius * 2, HALF_PI, 3 * HALF_PI);
         noStroke();
     }
@@ -153,17 +159,25 @@ class Table {
     }
     
     createBoundaries() {
-        const boundaryOptions = { isStatic: true, restitution: 0.8, render: { visible: false } };
+        const boundaryOptions = { 
+            isStatic: true,
+            restitution: 0.8,
+            render: { visible: false },
+            label: 'table_boundary' // Label for collision filtering
+        };
         const railThickness = 16;
         const pocketOffset = this.pocketRadius * 1.8;
+
         const longRailWidth = (this.width / 2) - pocketOffset;
         
         this.boundaries.push(Matter.Bodies.rectangle(this.playMinX + longRailWidth / 2, this.playMinY - railThickness / 2, longRailWidth, railThickness, boundaryOptions));
         this.boundaries.push(Matter.Bodies.rectangle(this.playMaxX - longRailWidth / 2, this.playMinY - railThickness / 2, longRailWidth, railThickness, boundaryOptions));
+        
         this.boundaries.push(Matter.Bodies.rectangle(this.playMinX + longRailWidth / 2, this.playMaxY + railThickness / 2, longRailWidth, railThickness, boundaryOptions));
         this.boundaries.push(Matter.Bodies.rectangle(this.playMaxX - longRailWidth / 2, this.playMaxY + railThickness / 2, longRailWidth, railThickness, boundaryOptions));
         
         const shortRailHeight = this.height - (pocketOffset * 2);
+        
         this.boundaries.push(Matter.Bodies.rectangle(this.playMinX - railThickness / 2, this.y, railThickness, shortRailHeight, boundaryOptions));
         this.boundaries.push(Matter.Bodies.rectangle(this.playMaxX + railThickness / 2, this.y, railThickness, shortRailHeight, boundaryOptions));
 

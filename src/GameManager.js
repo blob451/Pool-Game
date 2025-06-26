@@ -1,6 +1,6 @@
 // src/GameManager.js
 /**
- * This version uses the modern Matter.Runner to run the physics engine.
+ * This version adds logic to track the current player's break.
  */
 class GameManager {
     constructor() {
@@ -11,7 +11,6 @@ class GameManager {
         this.engine.positionIterations = 10;
         this.engine.velocityIterations = 8;
         
-        // Use the modern Matter.Runner to run the engine
         const runner = Matter.Runner.create();
         Matter.Runner.run(runner, this.engine);
         
@@ -43,6 +42,7 @@ class GameManager {
         this.firstContact = null;
         this.turnEndedByFoul = false;
         this.potMadeThisTurn = [];
+        this.currentBreak = 0; // New property to track the break score
         
         // ENDGAME STATE
         this.endgamePhase = false;
@@ -113,16 +113,14 @@ class GameManager {
     }
 
     draw() {
-        // Delegate all drawing to the appropriate managers
         this.table.draw();
         for (let ball of this.balls) { ball.show(); }
         this.cue.draw();
-        this.uiManager.draw(); // UIManager handles all UI
+        this.uiManager.draw();
     }
 
     handleInput(eventType) {
         if (eventType === 'mousePressed') {
-            // Let the UI Manager handle its own clicks first
             if (this.uiManager.handleInput(mouseX, mouseY)) {
                 return;
             }
@@ -205,6 +203,14 @@ class GameManager {
         if (this.potMadeThisTurn.length === 0) return false;
         const isColorNominated = this.colorSequence.includes(this.ballOn);
         const pottedRed = this.potMadeThisTurn.find(b => b.type === 'red');
+
+        // Update the current break score *if the turn is not a foul*
+        if (!this.turnEndedByFoul) {
+            this.potMadeThisTurn.forEach(pottedBall => {
+                this.currentBreak += pottedBall.value;
+            });
+        }
+
         if (this.endgamePhase) {
             const pottedTargetColor = this.potMadeThisTurn.find(b => b.type === 'color' && b.colorName === this.ballOn);
             if (pottedTargetColor) {
@@ -314,6 +320,7 @@ class GameManager {
 
     switchPlayer() {
         this.currentPlayer = 1 - this.currentPlayer;
+        this.currentBreak = 0; // Reset the break score on player switch
         if (!this.endgamePhase) { this.ballOn = 'red'; }
         else { this.ballOn = this.colorSequence[this.endgameColorIndex]; }
     }
@@ -347,5 +354,6 @@ class GameManager {
         this.ballOn = 'red'; this.firstContact = null;
         this.endgamePhase = false;
         this.endgameColorIndex = 0;
+        this.currentBreak = 0;
     }
 }
