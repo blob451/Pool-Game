@@ -1,7 +1,7 @@
 // src/UIManager.js
 /**
- * This version implements a central information panel and UI animations
- * for a more polished user experience.
+ * This version implements a central information panel, UI animations,
+ * and the UI for interactive ball-in-hand placement.
  */
 class UIManager {
     constructor(gameManager) {
@@ -43,34 +43,32 @@ class UIManager {
      * Main draw call for the entire UI.
      */
     draw() {
-        this.drawPocketAnimations(); // Draw animations underneath other UI elements
+        this.drawPocketAnimations();
         this.drawScoreboard();
         this.drawNewFrameButton();
         this.drawInfoPanel();
+
+        if (this.gameManager.gameState === 'BALL_IN_HAND') {
+            this.drawBallInHandUI();
+        }
 
         if (this.gameManager.gameOver) {
             this.drawGameOverUI();
         }
     }
     
-    /**
-     * Handles the "shrink and fade" animation for pocketed balls.
-     */
     drawPocketAnimations() {
         push();
         for (let i = this.pocketAnimations.length - 1; i >= 0; i--) {
             const anim = this.pocketAnimations[i];
             
-            // Set the ball color with the current animated alpha
             fill(red(anim.color), green(anim.color), blue(anim.color), anim.alpha);
             noStroke();
             ellipse(anim.x, anim.y, anim.radius * 2);
 
-            // Update animation properties for the next frame
-            anim.radius *= 0.95; // Shrink the ball
-            anim.alpha -= 10;    // Fade it out
+            anim.radius *= 0.95;
+            anim.alpha -= 10;
 
-            // Remove the animation once it's invisible
             if (anim.alpha <= 0) {
                 this.pocketAnimations.splice(i, 1);
             }
@@ -88,7 +86,7 @@ class UIManager {
 
         // Player 1
         fill(255);
-        textSize(22 + this.p1ScoreAnim); // Apply score flash animation
+        textSize(22 + this.p1ScoreAnim);
         textAlign(LEFT, TOP);
         text('Player 1', startX, startY);
         text(p1, startX + 150, startY);
@@ -99,7 +97,7 @@ class UIManager {
 
         // Player 2
         fill(255);
-        textSize(22 + this.p2ScoreAnim); // Apply score flash animation
+        textSize(22 + this.p2ScoreAnim);
         text('Player 2', startX, startY + lineHeight);
         text(p2, startX + 150, startY + lineHeight);
         if (this.gameManager.currentPlayer === 1) {
@@ -107,14 +105,12 @@ class UIManager {
             ellipse(startX - 15, startY + lineHeight + 12, 10, 10);
         }
         
-        // Break score
         if (this.gameManager.currentBreak > 0) {
             fill(255);
             textSize(20);
             text(`Break: ${this.gameManager.currentBreak}`, startX, startY + lineHeight * 2);
         }
 
-        // Decay animation values
         this.p1ScoreAnim *= 0.9;
         this.p2ScoreAnim *= 0.9;
         
@@ -129,21 +125,21 @@ class UIManager {
         let textColor = color(255);
         let panelAlpha = 0;
 
-        // Determine what text to show based on game state and calculate alpha for fades
-        if (this.gameManager.foulMessageTimer > 0) {
+        if (this.gameManager.gameState === 'BALL_IN_HAND') {
+            infoText = "Place Cue Ball in the D";
+            panelAlpha = 180;
+        } else if (this.gameManager.foulMessageTimer > 0) {
             infoText = this.gameManager.foulMessage;
             textColor = color(255, 80, 80);
             
-            const maxTime = 180; // The initial value of the foul timer
+            const maxTime = 180;
             const fadeDuration = 30;
             if (this.gameManager.foulMessageTimer > maxTime - fadeDuration) {
-                // Fade in
                 panelAlpha = map(this.gameManager.foulMessageTimer, maxTime, maxTime - fadeDuration, 0, 180);
             } else if (this.gameManager.foulMessageTimer < fadeDuration) {
-                // Fade out
                 panelAlpha = map(this.gameManager.foulMessageTimer, 0, fadeDuration, 0, 180);
             } else {
-                panelAlpha = 180; // Fully visible
+                panelAlpha = 180;
             }
         } else if (this.gameManager.gameState === 'AWAITING_NOMINATION') {
             infoText = 'Nominate a Color';
@@ -174,6 +170,35 @@ class UIManager {
         pop();
     }
     
+    /**
+     * --- NEW: Draws the UI for ball-in-hand placement ---
+     */
+    drawBallInHandUI() {
+        push();
+        // Highlight the "D" area
+        noStroke();
+        fill(255, 255, 255, 30);
+        arc(
+            this.gameManager.table.baulkLineX,
+            this.gameManager.table.y,
+            this.gameManager.table.dRadius * 2,
+            this.gameManager.table.dRadius * 2,
+            HALF_PI,
+            3 * HALF_PI
+        );
+
+        // Draw the "ghost" cue ball that follows the mouse
+        const ghost = this.gameManager.ghostCueBall;
+        if (ghost.isValid) {
+            fill(255, 255, 255, 150); // White for valid placement
+        } else {
+            fill(255, 0, 0, 150); // Red for invalid placement
+        }
+        noStroke();
+        ellipse(ghost.x, ghost.y, this.gameManager.BALL_RADIUS * 2);
+        pop();
+    }
+
     drawNominationButtons() {
         push();
         rectMode(CORNER);
@@ -244,29 +269,19 @@ class UIManager {
         return false;
     }
 
-    // --- PUBLIC METHODS FOR ANIMATION TRIGGERS ---
-
-    /**
-     * Creates a temporary animation object for a pocketed ball.
-     * @param {Ball} ball - The ball that was pocketed.
-     */
     addPocketAnimation(ball) {
         this.pocketAnimations.push({
             x: ball.body.position.x,
             y: ball.body.position.y,
             radius: ball.r,
-            color: color(ball.color), // Convert to p5.Color object
+            color: color(ball.color),
             alpha: 255
         });
     }
 
-    /**
-     * Triggers the "score flash" animation for the specified player.
-     * @param {number} playerIndex - The index of the player who scored.
-     */
     triggerScoreAnimation(playerIndex) {
         if (playerIndex === 0) {
-            this.p1ScoreAnim = 12; // Starting size increase
+            this.p1ScoreAnim = 12;
         } else {
             this.p2ScoreAnim = 12;
         }

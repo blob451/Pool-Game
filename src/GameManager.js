@@ -1,7 +1,7 @@
 // src/GameManager.js
 /**
- * This version integrates with UIManager to trigger animations for
- * pocketed balls and score updates.
+ * This version implements interactive "ball-in-hand" placement,
+ * including at the start of a new frame.
  */
 class GameManager {
     constructor() {
@@ -32,12 +32,13 @@ class GameManager {
         this.MAX_BALL_SPEED = 12;
 
         // GAME STATE
-        this.gameState = 'AWAITING_SHOT';
         this.currentPlayer = 0;
         this.gameOver = false;
         this.pottedColorsToRespot = [];
         this.cueBallNeedsRespotted = false;
         
+        this.ghostCueBall = { x: 0, y: 0, isValid: false };
+
         // TURN & RULE STATE
         this.ballOn = 'red'; 
         this.firstContact = null;
@@ -56,21 +57,23 @@ class GameManager {
 
         // BALLS & CUE
         this.balls = [];
+        this.cue = new Cue(null); // Create cue without a ball initially
+        this.cueBall = null;
+
+        // --- MODIFIED: Start the game in BALL_IN_HAND state ---
         this.setupBalls();
-        this.cueBall = this.balls.find(ball => ball.type === 'cue');
-        this.cue = new Cue(this.cueBall);
+        this.gameState = 'BALL_IN_HAND';
     }
     
     setupBalls() {
+        // This method now ONLY sets up the object balls (reds and colors).
+        // The cue ball is placed interactively by the player.
         const baulkLineX = this.TABLE_LEFT_X + (this.TABLE_WIDTH / 5);
-        const cueBallX = this.TABLE_LEFT_X + (this.TABLE_WIDTH / 6);
         const dRadius = this.table.dRadius;
         const tableCenterY = this.TABLE_Y;
         const blueSpot = { x: this.TABLE_X, y: tableCenterY };
         const pinkSpot = { x: this.TABLE_LEFT_X + (this.TABLE_WIDTH * 9 / 12), y: tableCenterY };
         const blackSpot = { x: this.TABLE_LEFT_X + (this.TABLE_WIDTH * 10 / 11), y: tableCenterY };
-        
-        this.balls.push(new Ball(cueBallX, tableCenterY, 'cue', 'white', 0));
         
         const colors = ['yellow', 'green', 'brown', 'blue', 'pink', 'black'];
         colors.forEach(color => {
@@ -113,6 +116,8 @@ class GameManager {
             if (areBallsStationary(this.balls)) { this.gameState = 'HANDLING_TURN_END'; }
         } else if (this.gameState === 'HANDLING_TURN_END') {
             this.handleTurnEndLogic();
+        } else if (this.gameState === 'BALL_IN_HAND') {
+            this.updateGhostBallPosition();
         }
     }
 
@@ -140,6 +145,10 @@ class GameManager {
                     this.firstContact = null; this.turnEndedByFoul = false; this.potMadeThisTurn = [];
                     this.cue.shoot(); this.gameState = 'BALLS_MOVING';
                 }
+            }
+        } else if (this.gameState === 'BALL_IN_HAND') {
+            if (eventType === 'mousePressed' && this.ghostCueBall.isValid) {
+                this.placeNewCueBall();
             }
         }
     }
@@ -169,7 +178,7 @@ class GameManager {
         
         if (!this.turnEndedByFoul && this.potMadeThisTurn.length > 0) {
             this.scoring.processTurn(this.potMadeThisTurn, this.currentPlayer);
-            this.uiManager.triggerScoreAnimation(this.currentPlayer); // ANIMATION TRIGGER
+            this.uiManager.triggerScoreAnimation(this.currentPlayer);
         }
         
         if (!this.endgamePhase && !this.areRedsRemaining()) {
@@ -189,9 +198,13 @@ class GameManager {
             return;
         }
 
-        if (this.cueBallNeedsRespotted) { this.respotCueBall(); }
-        this.respotColors();
-        this.gameState = 'AWAITING_SHOT';
+        if (this.cueBallNeedsRespotted) {
+            this.gameState = 'BALL_IN_HAND';
+            this.cueBallNeedsRespotted = false;
+        } else {
+            this.respotColors();
+            this.gameState = 'AWAITING_SHOT';
+        }
     }
 
     checkForFouls() {
@@ -256,7 +269,7 @@ class GameManager {
                     if (ball.type === 'cue') {
                         this.handleCueBallPocketed();
                     } else {
-                        this.uiManager.addPocketAnimation(ball); // ANIMATION TRIGGER
+                        this.uiManager.addPocketAnimation(ball);
                         Matter.Body.setVelocity(ball.body, { x: 0, y: 0 });
                         this.potMadeThisTurn.push(ball); 
                         ball.remove();
@@ -283,24 +296,32 @@ class GameManager {
         this.cueBall = null;
     }
 
-    respotCueBall() {
-        const baulkLineX = this.TABLE_LEFT_X + (this.TABLE_WIDTH / 5);
-        const dRadius = this.table.dRadius;
-        let cueX, cueY; let positionFound = false;
-        cueX = this.TABLE_LEFT_X + (this.TABLE_WIDTH / 6); cueY = this.TABLE_Y;
-        let collides = this.balls.some(b => b && b.body && distance(b.body.position.x, b.body.position.y, cueX, cueY) < this.BALL_RADIUS * 2);
-        if (collides) {
-            for (let i = 0; i < 20; i++) {
-                const angle = random(-HALF_PI, HALF_PI); const radius = random(0, dRadius);
-                cueX = baulkLineX - cos(angle) * radius; cueY = this.TABLE_Y - sin(angle) * radius;
-                let innerCollides = this.balls.some(b => b && b.body && distance(b.body.position.x, b.body.position.y, cueX, cueY) < this.BALL_RADIUS * 2);
-                if (!innerCollides) { positionFound = true; break; }
+    updateGhostBallPosition() {
+        this.ghostCueBall.x = mouseX;
+        this.ghostCueBall.y = mouseY;
+        let isValid = true;
+
+        const dCenterX = this.table.baulkLineX;
+        const dCenterY = this.table.y;
+        if (mouseX > dCenterX || distance(mouseX, mouseY, dCenterX, dCenterY) > this.table.dRadius) {
+            isValid = false;
+        }
+
+        for (const ball of this.balls) {
+            if (distance(mouseX, mouseY, ball.body.position.x, ball.body.position.y) < this.BALL_RADIUS * 2) {
+                isValid = false;
+                break;
             }
-        } else { positionFound = true; }
-        if (!positionFound) { cueX = this.TABLE_LEFT_X + (this.TABLE_WIDTH / 6); cueY = this.TABLE_Y; }
-        const newCueBall = new Ball(cueX, cueY, 'cue', 'white', 0);
-        this.balls.push(newCueBall); this.cueBall = newCueBall;
-        this.cue.cueBall = newCueBall; this.cueBallNeedsRespotted = false;
+        }
+        this.ghostCueBall.isValid = isValid;
+    }
+
+    placeNewCueBall() {
+        const newCueBall = new Ball(this.ghostCueBall.x, this.ghostCueBall.y, 'cue', 'white', 0);
+        this.balls.push(newCueBall);
+        this.cueBall = newCueBall;
+        this.cue.cueBall = newCueBall;
+        this.gameState = 'AWAITING_SHOT';
     }
 
     respotColors() {
@@ -329,7 +350,7 @@ class GameManager {
 
     switchPlayer() {
         this.currentPlayer = 1 - this.currentPlayer;
-        this.currentBreak = 0; // Reset the break score on player switch
+        this.currentBreak = 0;
         if (!this.endgamePhase) { this.ballOn = 'red'; }
         else { this.ballOn = this.colorSequence[this.endgameColorIndex]; }
     }
@@ -351,16 +372,24 @@ class GameManager {
 
     reset() {
         for (let ball of this.balls) { ball.remove(); }
-        this.balls = []; this.pottedColorsToRespot = []; this.potMadeThisTurn = [];
+        this.balls = []; 
+        this.pottedColorsToRespot = []; 
+        this.potMadeThisTurn = [];
+        
         this.setupBalls();
-        this.cueBall = this.balls.find(ball => ball.type === 'cue');
-        this.cue.cueBall = this.cueBall;
+
+        this.cueBall = null;
+        this.cue.cueBall = null;
+        
         this.scoring.reset();
         this.currentPlayer = 0;
         this.gameOver = false;
         this.cueBallNeedsRespotted = false;
-        this.gameState = 'AWAITING_SHOT';
-        this.ballOn = 'red'; this.firstContact = null;
+        
+        this.gameState = 'BALL_IN_HAND';
+
+        this.ballOn = 'red'; 
+        this.firstContact = null;
         this.endgamePhase = false;
         this.endgameColorIndex = 0;
         this.currentBreak = 0;
