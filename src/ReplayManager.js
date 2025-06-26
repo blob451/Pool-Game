@@ -1,36 +1,36 @@
 // src/ReplayManager.js
 /**
- * This version adds the "Ghost Shot" functionality for saving and overlaying replays.
+ * This version adds slow-motion playback to the replay system.
  */
 class ReplayManager {
     constructor(gameManager) {
-        this.gameManager = gameManager; // Reference to the main game manager
-        this.state = 'IDLE'; // Can be 'IDLE', 'RECORDING', 'REPLAYING'
+        this.gameManager = gameManager;
+        this.state = 'IDLE';
         
-        this.replayData = []; // Stores the entire recorded shot, frame by frame
-        // [GHOST] Stores a saved replay for the ghost feature
-        this.ghostData = null; 
+        this.replayData = [];
+        this.ghostData = null;
 
-        this.replayFrameIndex = 0; // Tracks the current frame during playback
-        // [GHOST] Tracks the ghost's frame index during live play
-        this.ghostFrameIndex = 0; 
+        this.replayFrameIndex = 0;
+        this.ghostFrameIndex = 0;
+        
+        // --- NEW: Slow-motion state ---
+        this.isSlowMotion = false;
     }
 
     /**
-     * Called every frame by the main p5.js draw loop.
-     * Its behavior depends on the current state.
+     * Called every frame. Advances the replay or ghost animation.
      */
     update() {
         if (this.state === 'REPLAYING') {
-            this.replayFrameIndex++;
+            const speed = this.isSlowMotion ? 0.4 : 1.0;
+            this.replayFrameIndex += speed;
+
             if (this.replayFrameIndex >= this.replayData.length) {
                 this.stopReplay();
             }
         } 
-        // [GHOST] Update the ghost frame index during live play if a ghost is active.
         else if (this.state === 'IDLE' && this.ghostData) {
             this.ghostFrameIndex++;
-            // Loop the ghost animation if it reaches the end
             if (this.ghostFrameIndex >= this.ghostData.length) {
                 this.ghostFrameIndex = 0;
             }
@@ -38,7 +38,7 @@ class ReplayManager {
     }
 
     /**
-     * Called by GameManager to draw the main replay.
+     * Draws the main replay frame.
      */
     draw() {
         if (this.state === 'REPLAYING') {
@@ -47,10 +47,10 @@ class ReplayManager {
     }
 
     /**
-     * Renders a single frame of the replay.
+     * Renders a single frame of the replay, using the integer part of the frame index.
      */
     drawReplayFrame() {
-        const frame = this.replayData[this.replayFrameIndex];
+        const frame = this.replayData[Math.floor(this.replayFrameIndex)];
         if (!frame) return;
 
         push();
@@ -59,13 +59,16 @@ class ReplayManager {
             if (originalBall) {
                 fill(originalBall.color);
                 noStroke();
+                // --- FIXED: Used ballState.y instead of ball.y ---
                 ellipse(ballState.x, ballState.y, originalBall.r * 2);
             }
         }
         pop();
     }
 
-    // [GHOST] Renders the translucent ghost shot overlay.
+    /**
+     * Renders the translucent ghost shot overlay.
+     */
     drawGhost() {
         if (!this.ghostData || this.state !== 'IDLE') return;
 
@@ -76,9 +79,8 @@ class ReplayManager {
         for (const ballState of frame) {
             const originalBall = this.gameManager.balls.find(b => b.body.id === ballState.id);
             if (originalBall) {
-                // Get the ball's color and set its alpha for transparency
                 const ghostColor = color(originalBall.color);
-                ghostColor.setAlpha(80); // 80 out of 255 for a nice ghost effect
+                ghostColor.setAlpha(80);
                 
                 fill(ghostColor);
                 noStroke();
@@ -94,7 +96,6 @@ class ReplayManager {
         if (this.state !== 'IDLE') return;
         this.state = 'RECORDING';
         this.replayData = [];
-        // [GHOST] Reset ghost playback on every new shot
         this.ghostFrameIndex = 0; 
         console.log("ReplayManager: Recording started.");
     }
@@ -103,7 +104,6 @@ class ReplayManager {
         if (this.state !== 'RECORDING') return;
 
         const frame = [];
-        // Use a traditional for loop for performance, as this runs every physics tick
         for (let i = 0; i < this.gameManager.balls.length; i++) {
             const ball = this.gameManager.balls[i];
             if (ball.body) {
@@ -128,6 +128,7 @@ class ReplayManager {
         if (this.state !== 'IDLE' || this.replayData.length === 0) return;
         this.state = 'REPLAYING';
         this.replayFrameIndex = 0;
+        this.isSlowMotion = false; // Always start replay in normal speed
         console.log("ReplayManager: Replay started.");
     }
 
@@ -138,18 +139,20 @@ class ReplayManager {
         console.log("ReplayManager: Replay finished.");
     }
 
-    // [GHOST] Saves the last recorded shot as the ghost.
     saveAsGhost() {
         if (this.replayData.length === 0) return;
-        // Create a deep copy of the replay data to prevent accidental modification
         this.ghostData = JSON.parse(JSON.stringify(this.replayData));
         this.ghostFrameIndex = 0;
         console.log("ReplayManager: Current shot saved as ghost.");
     }
 
-    // [GHOST] Clears any saved ghost data.
     clearGhost() {
         this.ghostData = null;
         console.log("ReplayManager: Ghost data cleared.");
+    }
+    
+    toggleSlowMotion() {
+        this.isSlowMotion = !this.isSlowMotion;
+        console.log(`ReplayManager: Slow motion ${this.isSlowMotion ? 'enabled' : 'disabled'}.`);
     }
 }

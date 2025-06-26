@@ -1,6 +1,6 @@
 // src/UIManager.js
 /**
- * This version adjusts the UI layout, placing extension buttons next to mode buttons.
+ * This version adds a slow-motion toggle button to the replay overlay and fixes input handling.
  */
 class UIManager {
     constructor(gameManager) {
@@ -12,12 +12,12 @@ class UIManager {
         this.replayButton = null;
         this.saveGhostButton = null;
         this.clearGhostButton = null;
+        this.slowMoButton = null;
 
         // Create all UI elements
         this.createNominationButtons();
-        // The order is important here: create mode buttons first to get their position.
         this.createModeButtons();
-        this.createReplayButtons(); // This now creates all extension buttons
+        this.createReplayButtons();
         
         // Animation properties
         this.pocketAnimations = [];
@@ -57,17 +57,15 @@ class UIManager {
         ];
     }
 
-    // This function now creates all extension-related buttons in a new column.
     createReplayButtons() {
         const buttonWidth = 200;
         const buttonHeight = 40;
         const spacing = 10;
-        // Position the new column to the left of the mode buttons
         const startX = this.modeButtons[0].x - buttonWidth - spacing; 
 
         this.replayButton = {
             x: startX,
-            y: this.modeButtons[0].y, // Align with top mode button
+            y: this.modeButtons[0].y,
             width: buttonWidth,
             height: buttonHeight,
             label: 'Instant Replay'
@@ -75,7 +73,7 @@ class UIManager {
         
         this.saveGhostButton = {
             x: startX,
-            y: this.modeButtons[1].y, // Align with middle mode button
+            y: this.modeButtons[1].y,
             width: buttonWidth,
             height: buttonHeight,
             label: 'Ghost Replay'
@@ -83,10 +81,18 @@ class UIManager {
 
         this.clearGhostButton = {
             x: startX,
-            y: this.modeButtons[2].y, // Align with bottom mode button
+            y: this.modeButtons[2].y,
             width: buttonWidth,
             height: buttonHeight,
             label: 'Clear Ghost'
+        };
+
+        this.slowMoButton = {
+            x: width / 2 - 100,
+            y: 100,
+            width: 200,
+            height: 40,
+            label: 'Toggle Slow-Mo'
         };
     }
 
@@ -322,9 +328,15 @@ class UIManager {
         rectMode(CORNER);
         textAlign(CENTER, CENTER);
 
-        const drawStyledButton = (btn) => {
-            fill(200, 220, 255, 200);
-            stroke(100);
+        const drawStyledButton = (btn, highlight = false) => {
+            if (highlight) {
+                fill(135, 206, 250, 220); // A light blue to show it's active
+                stroke(255);
+            } else {
+                fill(200, 220, 255, 200);
+                stroke(100);
+            }
+            
             strokeWeight(1);
             rect(btn.x, btn.y, btn.width, btn.height, 5);
             
@@ -355,6 +367,8 @@ class UIManager {
             
             textSize(18);
             text('Press any key to exit', width / 2, 60);
+            
+            drawStyledButton(this.slowMoButton, replayManager.isSlowMotion);
         }
         pop();
     }
@@ -378,6 +392,15 @@ class UIManager {
     
     handleInput(mx, my) {
         const replayManager = this.gameManager.replayManager;
+        
+        if (replayManager && replayManager.state === 'REPLAYING') {
+            const btn = this.slowMoButton;
+            if (mx > btn.x && mx < btn.x + btn.width && my > btn.y && my < btn.y + btn.height) {
+                replayManager.toggleSlowMotion();
+                return true;
+            }
+        }
+
         if (replayManager && replayManager.state === 'IDLE') {
             if (replayManager.replayData.length > 0) {
                 const replayBtn = this.replayButton;
