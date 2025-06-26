@@ -1,6 +1,6 @@
 // src/ReplayManager.js
 /**
- * This version adds slow-motion playback to the replay system.
+ * This version adds looping replay and slow-motion playback.
  */
 class ReplayManager {
     constructor(gameManager) {
@@ -13,7 +13,6 @@ class ReplayManager {
         this.replayFrameIndex = 0;
         this.ghostFrameIndex = 0;
         
-        // --- NEW: Slow-motion state ---
         this.isSlowMotion = false;
     }
 
@@ -25,8 +24,9 @@ class ReplayManager {
             const speed = this.isSlowMotion ? 0.4 : 1.0;
             this.replayFrameIndex += speed;
 
+            // --- MODIFIED: Loop the replay when it reaches the end ---
             if (this.replayFrameIndex >= this.replayData.length) {
-                this.stopReplay();
+                this.replayFrameIndex = 0;
             }
         } 
         else if (this.state === 'IDLE' && this.ghostData) {
@@ -59,7 +59,6 @@ class ReplayManager {
             if (originalBall) {
                 fill(originalBall.color);
                 noStroke();
-                // --- FIXED: Used ballState.y instead of ball.y ---
                 ellipse(ballState.x, ballState.y, originalBall.r * 2);
             }
         }
@@ -128,7 +127,7 @@ class ReplayManager {
         if (this.state !== 'IDLE' || this.replayData.length === 0) return;
         this.state = 'REPLAYING';
         this.replayFrameIndex = 0;
-        this.isSlowMotion = false; // Always start replay in normal speed
+        this.isSlowMotion = false;
         console.log("ReplayManager: Replay started.");
     }
 
@@ -143,7 +142,7 @@ class ReplayManager {
         if (this.replayData.length === 0) return;
         this.ghostData = JSON.parse(JSON.stringify(this.replayData));
         this.ghostFrameIndex = 0;
-        console.log("ReplayManager: Current shot saved as ghost.");
+        console.log("ReplayManager: Current shot saved as Ghost Replay.");
     }
 
     clearGhost() {

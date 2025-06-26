@@ -1,6 +1,6 @@
 // src/GameManager.js
 /**
- * This version integrates the full Replay and Ghost Shot system.
+ * This version disables game input and the cue during replays.
  */
 class GameManager {
     constructor() {
@@ -167,11 +167,10 @@ class GameManager {
     // --- CORE GAME LOOP ---
 
     update() {
-        // Let the ReplayManager handle its own state updates (e.g., for ghost animation timing).
         this.replayManager.update();
 
         if (this.replayManager.state === 'REPLAYING') {
-            return; // Skip all game logic/physics during replay
+            return;
         }
 
         if (this.foulMessageTimer > 0) this.foulMessageTimer--;
@@ -200,23 +199,30 @@ class GameManager {
         if (this.replayManager.state === 'REPLAYING') {
             this.table.draw();
             this.replayManager.draw();
-            // The UI draw call is now placed outside this block to show the overlay
         } else {
             this.table.draw();
             for (let ball of this.balls) ball.show();
-            // [GHOST] Render the ghost shot overlay on top of the live balls.
             this.replayManager.drawGhost();
+            // The cue is only drawn when not in replay mode.
             this.cue.draw();
         }
 
-        // Draw the UI on top of everything, including replays (for the overlay).
         this.uiManager.draw();
     }
 
     // --- INPUT AND STATE HANDLING ---
     
     handleInput(eventType) {
-        if (eventType === 'mousePressed' && this.uiManager.handleInput(mouseX, mouseY)) return;
+        // First, allow the UI to handle its own input (e.g., for replay buttons).
+        if (eventType === 'mousePressed' && this.uiManager.handleInput(mouseX, mouseY)) {
+            return;
+        }
+
+        // --- MODIFIED: Block all game-related input if a replay is active. ---
+        if (this.replayManager.state === 'REPLAYING') {
+            return;
+        }
+        
         if (this.gameOver) return;
 
         if (this.gameState === 'AWAITING_SHOT') {

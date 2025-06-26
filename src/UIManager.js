@@ -1,6 +1,6 @@
 // src/UIManager.js
 /**
- * This version adds a slow-motion toggle button to the replay overlay and fixes input handling.
+ * This version refines the replay UI with a looping replay, a stop button, and a renamed ghost button.
  */
 class UIManager {
     constructor(gameManager) {
@@ -13,6 +13,8 @@ class UIManager {
         this.saveGhostButton = null;
         this.clearGhostButton = null;
         this.slowMoButton = null;
+        // --- NEW: Stop button for replay overlay ---
+        this.stopReplayButton = null;
 
         // Create all UI elements
         this.createNominationButtons();
@@ -76,6 +78,7 @@ class UIManager {
             y: this.modeButtons[1].y,
             width: buttonWidth,
             height: buttonHeight,
+            // --- MODIFIED: Renamed button ---
             label: 'Ghost Replay'
         };
 
@@ -93,6 +96,15 @@ class UIManager {
             width: 200,
             height: 40,
             label: 'Toggle Slow-Mo'
+        };
+
+        // --- NEW: Define the stop button for the replay overlay ---
+        this.stopReplayButton = {
+            x: width / 2 - 100,
+            y: this.slowMoButton.y + buttonHeight + spacing, // Position below slow-mo button
+            width: 200,
+            height: 40,
+            label: 'Stop Replay'
         };
     }
 
@@ -330,7 +342,7 @@ class UIManager {
 
         const drawStyledButton = (btn, highlight = false) => {
             if (highlight) {
-                fill(135, 206, 250, 220); // A light blue to show it's active
+                fill(135, 206, 250, 220);
                 stroke(255);
             } else {
                 fill(200, 220, 255, 200);
@@ -366,9 +378,11 @@ class UIManager {
             text('REPLAY MODE', width / 2, 20);
             
             textSize(18);
-            text('Press any key to exit', width / 2, 60);
+            text('Press SPACE to exit', width / 2, 60);
             
             drawStyledButton(this.slowMoButton, replayManager.isSlowMotion);
+            // --- NEW: Draw the stop button on the overlay ---
+            drawStyledButton(this.stopReplayButton);
         }
         pop();
     }
@@ -394,9 +408,15 @@ class UIManager {
         const replayManager = this.gameManager.replayManager;
         
         if (replayManager && replayManager.state === 'REPLAYING') {
-            const btn = this.slowMoButton;
-            if (mx > btn.x && mx < btn.x + btn.width && my > btn.y && my < btn.y + btn.height) {
+            const slowMoBtn = this.slowMoButton;
+            if (mx > slowMoBtn.x && mx < slowMoBtn.x + slowMoBtn.width && my > slowMoBtn.y && my < slowMoBtn.y + slowMoBtn.height) {
                 replayManager.toggleSlowMotion();
+                return true;
+            }
+            // --- NEW: Handle input for the stop button ---
+            const stopBtn = this.stopReplayButton;
+            if (mx > stopBtn.x && mx < stopBtn.x + stopBtn.width && my > stopBtn.y && my < stopBtn.y + stopBtn.height) {
+                replayManager.stopReplay();
                 return true;
             }
         }
