@@ -1,21 +1,31 @@
 // src/main.js
 /**
- * p5.js entry point. This version is cleaned up, delegating all UI drawing to the UIManager.
+ * p5.js entry point. Includes keyPressed() for mode switching.
  */
 let gameManager;
 
 function setup() {
-    let canvas = createCanvas(1500, 1000);
-    canvas.position(0, 0);
+    createCanvas(1500, 1000).position(0, 0);
     gameManager = new GameManager();
 }
 
 function draw() {
     background(0, 50, 0); // A darker green for the outer area
-    
-    // GameManager now handles all game-related updates and drawing calls.
     gameManager.update();
     gameManager.draw();
+}
+
+function keyPressed() {
+    if (key === '1') {
+        console.log("Starting Mode 1: Standard Layout");
+        gameManager.startNewMode(1);
+    } else if (key === '2') {
+        console.log("Starting Mode 2: Random All Balls");
+        gameManager.startNewMode(2);
+    } else if (key === '3') {
+        console.log("Starting Mode 3: Random Reds Only");
+        gameManager.startNewMode(3);
+    }
 }
 
 function mousePressed() {
