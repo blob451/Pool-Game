@@ -31,8 +31,8 @@ class GameManager {
         this.TABLE_MIN_Y = this.table.playMinY;
         this.TABLE_MAX_Y = this.table.playMaxY;
         this.BALL_RADIUS = Ball.snookerRadius();
+        this.MAX_BALL_SPEED = 30;
         
-        // --- FIXED: Initialize all properties before use ---
         this.balls = [];
         this.ghostCueBall = { x: 0, y: 0, isValid: false };
         this.cue = new Cue(null);
@@ -76,6 +76,7 @@ class GameManager {
             else if (color === 'pink') spot = pinkSpot;
             else if (color === 'black') spot = blackSpot;
             const ball = new Ball(spot.x, spot.y, 'color', color, this.scoring.getBallValue(color));
+            ball.colorName = color;
             this.balls.push(ball);
         });
 
@@ -85,7 +86,9 @@ class GameManager {
             for (let col = 0; col <= row; col++) {
                 const x = triangleApex.x + row * (this.BALL_RADIUS * 2 * 0.88);
                 const y = yStart + col * (this.BALL_RADIUS * 2 + 1);
-                this.balls.push(new Ball(x, y, 'red', '#d62828', 1));
+                const redBall = new Ball(x, y, 'red', '#d62828', 1);
+                redBall.colorName = 'red';
+                this.balls.push(redBall);
             }
         }
     }
@@ -122,6 +125,7 @@ class GameManager {
             else if (color === 'pink') spot = pinkSpot;
             else if (color === 'black') spot = blackSpot;
             const ball = new Ball(spot.x, spot.y, 'color', color, this.scoring.getBallValue(color));
+            ball.colorName = color;
             this.balls.push(ball);
         });
         
@@ -151,7 +155,7 @@ class GameManager {
         }
         const color = type === 'red' ? '#d62828' : Ball.resolveColor(type, colorName);
         const ball = new Ball(position.x, position.y, type, color, value);
-        if (type === 'color') ball.colorName = colorName;
+        ball.colorName = colorName;
         this.balls.push(ball);
     }
 
@@ -161,6 +165,16 @@ class GameManager {
         if (this.foulMessageTimer > 0) this.foulMessageTimer--;
 
         if (this.gameState === 'BALLS_MOVING' && !this.cue.isShooting) {
+            // --- FIXED: Add speed limit to all balls to prevent tunneling ---
+            for (const ball of this.balls) {
+                if (ball.body.speed > this.MAX_BALL_SPEED) {
+                    Matter.Body.setVelocity(ball.body, {
+                        x: ball.body.velocity.x / ball.body.speed * this.MAX_BALL_SPEED,
+                        y: ball.body.velocity.y / ball.body.speed * this.MAX_BALL_SPEED
+                    });
+                }
+            }
+            
             this.checkPockets();
             if (this.cueBall && !this.table.isInPlayingArea(this.cueBall.body.position)) this.handleCueBallPocketed();
             if (areBallsStationary(this.balls)) this.gameState = 'HANDLING_TURN_END';
@@ -208,9 +222,12 @@ class GameManager {
 
             if (otherBody) {
                 let logEntry = null;
+                const lastCollision = this.collisionLog[this.collisionLog.length - 1];
                 if (otherBody.label === 'table_boundary') {
-                    logEntry = { type: 'cushion' };
-                    console.log(`Cue Ball Collision: Cushion`);
+                    if (!lastCollision || lastCollision.type !== 'cushion') {
+                        logEntry = { type: 'cushion' };
+                        console.log(`Cue Ball Collision: Cushion`);
+                    }
                 } else {
                     const hitBall = this.balls.find(b => b.body === otherBody);
                     if (hitBall) {
@@ -263,13 +280,16 @@ class GameManager {
     checkForFouls() {
         if (this.turnEndedByFoul) return;
         if (!this.firstContact) { this.commitFoul("Did not hit any ball", 4); return; }
+
+        const hitBallName = this.firstContact.colorName || 'Red';
         const isColorNominated = this.colorSequence.includes(this.ballOn);
+
         if (this.endgamePhase) {
-            if (this.firstContact.type !== 'color' || this.firstContact.colorName !== this.ballOn) { this.commitFoul(`Hit ${this.firstContact.colorName} when ${this.ballOn} was on`, this.firstContact.value); }
+            if (this.firstContact.type !== 'color' || this.firstContact.colorName !== this.ballOn) { this.commitFoul(`Hit ${hitBallName} when ${this.ballOn} was on`, this.firstContact.value); }
         } else if (isColorNominated) {
-            if (this.firstContact.type !== 'color' || this.firstContact.colorName !== this.ballOn) { this.commitFoul(`Hit ${this.firstContact.colorName} when ${this.ballOn} was on`, 4); }
+            if (this.firstContact.type !== 'color' || this.firstContact.colorName !== this.ballOn) { this.commitFoul(`Hit ${hitBallName} when ${this.ballOn} was on`, 4); }
         } else if (this.ballOn === 'red' && this.firstContact.type !== 'red') {
-            this.commitFoul(`Hit ${this.firstContact.colorName} when a red was on`, this.firstContact.value);
+            this.commitFoul(`Hit ${hitBallName} when a red was on`, this.firstContact.value);
         }
     }
     
@@ -365,6 +385,7 @@ class GameManager {
 
     placeNewCueBall() {
         const newCueBall = new Ball(this.ghostCueBall.x, this.ghostCueBall.y, 'cue', 'white', 0);
+        newCueBall.colorName = 'cue';
         this.balls.push(newCueBall);
         this.cueBall = newCueBall;
         this.cue.cueBall = newCueBall;
@@ -439,6 +460,7 @@ class GameManager {
         this.cueBallNeedsRespotted = false;
         this.ballOn = 'red'; 
         this.firstContact = null;
+        this.colorSequence = ['yellow', 'green', 'brown', 'blue', 'pink', 'black'];
         this.endgamePhase = false; 
         this.endgameColorIndex = 0;
         this.currentBreak = 0;

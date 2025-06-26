@@ -1,6 +1,6 @@
 // src/UIManager.js
 /**
- * This version implements a visual collision log UI element using icons instead of text.
+ * This version replaces the "New Frame" button with a unified set of game mode buttons.
  */
 class UIManager {
     constructor(gameManager) {
@@ -8,7 +8,10 @@ class UIManager {
 
         // UI element properties
         this.nominationButtons = [];
-        this.newFrameButton = { x: width - 150, y: 50, width: 120, height: 40, label: 'New Frame' };
+        
+        // --- NEW: Replaces the old newFrameButton ---
+        this.modeButtons = [];
+        this.createModeButtons();
         
         // Animation properties
         this.pocketAnimations = [];
@@ -25,17 +28,29 @@ class UIManager {
         const startX = (width / 2) - (colorSequence.length * (buttonWidth + 10) / 2);
         const yPos = 80;
 
-        colorSequence.forEach((color, index) => {
-            this.nominationButtons.push({
-                x: startX + index * (buttonWidth + 10),
-                y: yPos,
-                width: buttonWidth,
-                height: buttonHeight,
-                colorName: color,
-                label: color.toUpperCase(),
-                fill: Ball.resolveColor('color', color)
-            });
-        });
+        this.nominationButtons = colorSequence.map((color, index) => ({
+            x: startX + index * (buttonWidth + 10),
+            y: yPos,
+            width: buttonWidth,
+            height: buttonHeight,
+            colorName: color,
+            label: color.toUpperCase(),
+            fill: Ball.resolveColor('color', color)
+        }));
+    }
+
+    createModeButtons() {
+        const buttonWidth = 200;
+        const buttonHeight = 40;
+        const startX = width - buttonWidth - 30;
+        const startY = 30;
+        const spacing = 10;
+
+        this.modeButtons = [
+            { x: startX, y: startY, width: buttonWidth, height: buttonHeight, label: 'Mode 1: Reset the game', mode: 1 },
+            { x: startX, y: startY + buttonHeight + spacing, width: buttonWidth, height: buttonHeight, label: 'Mode 2: Random balls', mode: 2 },
+            { x: startX, y: startY + (buttonHeight + spacing) * 2, width: buttonWidth, height: buttonHeight, label: 'Mode 3: Random reds', mode: 3 }
+        ];
     }
 
     /**
@@ -45,7 +60,7 @@ class UIManager {
         this.drawPocketAnimations();
         this.drawScoreboard();
         this.drawCollisionLog();
-        this.drawNewFrameButton();
+        this.drawModeButtons();
         this.drawInfoPanel();
 
         if (this.gameManager.gameState === 'BALL_IN_HAND') {
@@ -117,9 +132,6 @@ class UIManager {
         pop();
     }
 
-    /**
-     * --- MODIFIED: Draws a visual collision log with ball icons ---
-     */
     drawCollisionLog() {
         if (this.gameManager.collisionLog.length === 0) {
             return;
@@ -127,11 +139,10 @@ class UIManager {
 
         push();
         const startX = 30;
-        const yPos = 30 + 30 + 35; // Positioned below the scoreboard
+        const yPos = 30 + 30 + 35; 
         const iconSize = 14;
         const iconSpacing = 5;
 
-        // Draw "Collisions:" text
         fill(255, 255, 255, 200);
         textSize(14);
         textAlign(LEFT, CENTER);
@@ -139,7 +150,6 @@ class UIManager {
 
         let currentX = startX + 85;
 
-        // Draw each collision icon
         for (const entry of this.gameManager.collisionLog) {
             if (entry.type === 'ball') {
                 fill(entry.color);
@@ -252,19 +262,22 @@ class UIManager {
         pop();
     }
 
-    drawNewFrameButton() {
+    drawModeButtons() {
         push();
-        const btn = this.newFrameButton;
         rectMode(CORNER);
-        fill(200, 220, 255, 200);
-        stroke(100);
-        strokeWeight(1);
-        rect(btn.x, btn.y, btn.width, btn.height, 5);
-        fill(0);
-        noStroke();
-        textSize(18);
         textAlign(CENTER, CENTER);
-        text(btn.label, btn.x + btn.width / 2, btn.y + btn.height / 2);
+        
+        for (const btn of this.modeButtons) {
+            fill(200, 220, 255, 200);
+            stroke(100);
+            strokeWeight(1);
+            rect(btn.x, btn.y, btn.width, btn.height, 5);
+            
+            fill(0);
+            noStroke();
+            textSize(16);
+            text(btn.label, btn.x + btn.width / 2, btn.y + btn.height / 2);
+        }
         pop();
     }
     
@@ -286,10 +299,11 @@ class UIManager {
     }
     
     handleInput(mx, my) {
-        const btn = this.newFrameButton;
-        if (mx > btn.x && mx < btn.x + btn.width && my > btn.y && my < btn.y + btn.height) {
-            this.gameManager.reset();
-            return true;
+        for (const btn of this.modeButtons) {
+            if (mx > btn.x && mx < btn.x + btn.width && my > btn.y && my < btn.y + btn.height) {
+                this.gameManager.startNewMode(btn.mode);
+                return true;
+            }
         }
 
         if (this.gameManager.gameState === 'AWAITING_NOMINATION') {
