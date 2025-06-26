@@ -47,7 +47,7 @@ class UIManager {
         const spacing = 10;
 
         this.modeButtons = [
-            { x: startX, y: startY, width: buttonWidth, height: buttonHeight, label: 'Mode 1: Reset the game', mode: 1 },
+            { x: startX, y: startY, width: buttonWidth, height: buttonHeight, label: 'Mode 1: Game restart', mode: 1 },
             { x: startX, y: startY + buttonHeight + spacing, width: buttonWidth, height: buttonHeight, label: 'Mode 2: Random balls', mode: 2 },
             { x: startX, y: startY + (buttonHeight + spacing) * 2, width: buttonWidth, height: buttonHeight, label: 'Mode 3: Random reds', mode: 3 }
         ];
