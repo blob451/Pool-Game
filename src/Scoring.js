@@ -25,14 +25,11 @@ class Scoring {
 
     /**
      * Processes all legally potted balls at the end of a turn.
+     * This is now only called for legal pots, so no foul check is needed here.
      * @param {Ball[]} pottedBalls - An array of Ball objects potted during the turn.
      * @param {number} playerIdx - The index of the current player.
-     * @param {boolean} wasFoulCommitted - True if a foul occurred on the shot.
      */
-    processTurn(pottedBalls, playerIdx, wasFoulCommitted) {
-        if (wasFoulCommitted) {
-            return;
-        }
+    processTurn(pottedBalls, playerIdx) {
         for (const ball of pottedBalls) {
             this.addPoints(playerIdx, ball.value, `${ball.colorName || ball.type} potted`);
         }
