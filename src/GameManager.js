@@ -1,6 +1,7 @@
 // src/GameManager.js
 /**
- * This version adds logic to track the current player's break.
+ * This version integrates with UIManager to trigger animations for
+ * pocketed balls and score updates.
  */
 class GameManager {
     constructor() {
@@ -42,14 +43,14 @@ class GameManager {
         this.firstContact = null;
         this.turnEndedByFoul = false;
         this.potMadeThisTurn = [];
-        this.currentBreak = 0; // New property to track the break score
+        this.currentBreak = 0;
         
         // ENDGAME STATE
         this.endgamePhase = false;
         this.colorSequence = ['yellow', 'green', 'brown', 'blue', 'pink', 'black'];
         this.endgameColorIndex = 0;
         
-        // UI STATE (managed here, drawn by UIManager)
+        // UI STATE
         this.foulMessage = "";
         this.foulMessageTimer = 0;
 
@@ -61,9 +62,12 @@ class GameManager {
     }
     
     setupBalls() {
-        const baulkLineX = this.TABLE_LEFT_X + (this.TABLE_WIDTH / 5); const cueBallX = this.TABLE_LEFT_X + (this.TABLE_WIDTH / 6);
-        const dRadius = this.table.dRadius; const tableCenterY = this.TABLE_Y;
-        const blueSpot = { x: this.TABLE_X, y: tableCenterY }; const pinkSpot = { x: this.TABLE_LEFT_X + (this.TABLE_WIDTH * 9 / 12), y: tableCenterY };
+        const baulkLineX = this.TABLE_LEFT_X + (this.TABLE_WIDTH / 5);
+        const cueBallX = this.TABLE_LEFT_X + (this.TABLE_WIDTH / 6);
+        const dRadius = this.table.dRadius;
+        const tableCenterY = this.TABLE_Y;
+        const blueSpot = { x: this.TABLE_X, y: tableCenterY };
+        const pinkSpot = { x: this.TABLE_LEFT_X + (this.TABLE_WIDTH * 9 / 12), y: tableCenterY };
         const blackSpot = { x: this.TABLE_LEFT_X + (this.TABLE_WIDTH * 10 / 11), y: tableCenterY };
         
         this.balls.push(new Ball(cueBallX, tableCenterY, 'cue', 'white', 0));
@@ -162,14 +166,19 @@ class GameManager {
     handleTurnEndLogic() {
         this.checkForFouls();
         let legalPotMade = this.checkLegalPots();
-        this.scoring.processTurn(this.potMadeThisTurn, this.currentPlayer, this.turnEndedByFoul);
+        
+        if (!this.turnEndedByFoul && this.potMadeThisTurn.length > 0) {
+            this.scoring.processTurn(this.potMadeThisTurn, this.currentPlayer);
+            this.uiManager.triggerScoreAnimation(this.currentPlayer); // ANIMATION TRIGGER
+        }
         
         if (!this.endgamePhase && !this.areRedsRemaining()) {
             this.endgamePhase = true;
             this.ballOn = this.colorSequence[this.endgameColorIndex];
         }
 
-        const score1 = this.scoring.getScore(0); const score2 = this.scoring.getScore(1);
+        const score1 = this.scoring.getScore(0);
+        const score2 = this.scoring.getScore(1);
         const pointsLeft = this.calculatePointsRemaining();
         if (pointsLeft > 0 && Math.abs(score1 - score2) > pointsLeft) { this.gameOver = true; }
 
@@ -204,7 +213,6 @@ class GameManager {
         const isColorNominated = this.colorSequence.includes(this.ballOn);
         const pottedRed = this.potMadeThisTurn.find(b => b.type === 'red');
 
-        // Update the current break score *if the turn is not a foul*
         if (!this.turnEndedByFoul) {
             this.potMadeThisTurn.forEach(pottedBall => {
                 this.currentBreak += pottedBall.value;
@@ -248,6 +256,7 @@ class GameManager {
                     if (ball.type === 'cue') {
                         this.handleCueBallPocketed();
                     } else {
+                        this.uiManager.addPocketAnimation(ball); // ANIMATION TRIGGER
                         Matter.Body.setVelocity(ball.body, { x: 0, y: 0 });
                         this.potMadeThisTurn.push(ball); 
                         ball.remove();
