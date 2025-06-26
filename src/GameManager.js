@@ -104,7 +104,7 @@ class GameManager {
             this.foulMessageTimer--;
         }
 
-        if (this.gameState === 'BALLS_MOVING') {
+        if (this.gameState === 'BALLS_MOVING' && !this.cue.isShooting) {
             this.checkPockets();
             for (const ball of this.balls) {
                 if (ball.body.speed > this.MAX_BALL_SPEED) { Matter.Body.setVelocity(ball.body, { x: ball.body.velocity.x / ball.body.speed * this.MAX_BALL_SPEED, y: ball.body.velocity.y / ball.body.speed * this.MAX_BALL_SPEED }); }
