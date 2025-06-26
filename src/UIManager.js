@@ -1,7 +1,6 @@
 // src/UIManager.js
 /**
- * This version implements a central information panel, UI animations,
- * and the UI for interactive ball-in-hand placement.
+ * This version implements a visual collision log UI element using icons instead of text.
  */
 class UIManager {
     constructor(gameManager) {
@@ -45,6 +44,7 @@ class UIManager {
     draw() {
         this.drawPocketAnimations();
         this.drawScoreboard();
+        this.drawCollisionLog();
         this.drawNewFrameButton();
         this.drawInfoPanel();
 
@@ -108,12 +108,52 @@ class UIManager {
         if (this.gameManager.currentBreak > 0) {
             fill(255);
             textSize(20);
-            text(`Break: ${this.gameManager.currentBreak}`, startX, startY + lineHeight * 2);
+            text(`Break: ${this.gameManager.currentBreak}`, startX, startY + lineHeight * 2.5);
         }
 
         this.p1ScoreAnim *= 0.9;
         this.p2ScoreAnim *= 0.9;
         
+        pop();
+    }
+
+    /**
+     * --- MODIFIED: Draws a visual collision log with ball icons ---
+     */
+    drawCollisionLog() {
+        if (this.gameManager.collisionLog.length === 0) {
+            return;
+        }
+
+        push();
+        const startX = 30;
+        const yPos = 30 + 30 + 35; // Positioned below the scoreboard
+        const iconSize = 14;
+        const iconSpacing = 5;
+
+        // Draw "Collisions:" text
+        fill(255, 255, 255, 200);
+        textSize(14);
+        textAlign(LEFT, CENTER);
+        text("Collisions:", startX, yPos);
+
+        let currentX = startX + 85;
+
+        // Draw each collision icon
+        for (const entry of this.gameManager.collisionLog) {
+            if (entry.type === 'ball') {
+                fill(entry.color);
+                stroke(0, 50);
+                strokeWeight(1);
+                ellipse(currentX, yPos, iconSize);
+            } else if (entry.type === 'cushion') {
+                fill(100, 100, 100);
+                noStroke();
+                rectMode(CENTER);
+                rect(currentX, yPos, iconSize, iconSize / 2, 2);
+            }
+            currentX += iconSize + iconSpacing;
+        }
         pop();
     }
 
@@ -170,12 +210,8 @@ class UIManager {
         pop();
     }
     
-    /**
-     * --- NEW: Draws the UI for ball-in-hand placement ---
-     */
     drawBallInHandUI() {
         push();
-        // Highlight the "D" area
         noStroke();
         fill(255, 255, 255, 30);
         arc(
@@ -187,12 +223,11 @@ class UIManager {
             3 * HALF_PI
         );
 
-        // Draw the "ghost" cue ball that follows the mouse
         const ghost = this.gameManager.ghostCueBall;
         if (ghost.isValid) {
-            fill(255, 255, 255, 150); // White for valid placement
+            fill(255, 255, 255, 150);
         } else {
-            fill(255, 0, 0, 150); // Red for invalid placement
+            fill(255, 0, 0, 150);
         }
         noStroke();
         ellipse(ghost.x, ghost.y, this.gameManager.BALL_RADIUS * 2);

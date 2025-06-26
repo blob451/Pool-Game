@@ -1,7 +1,6 @@
 // src/GameManager.js
 /**
- * This version implements interactive "ball-in-hand" placement,
- * including at the start of a new frame.
+ * This version modifies the collision log to store ball color data for visual display.
  */
 class GameManager {
     constructor() {
@@ -45,6 +44,7 @@ class GameManager {
         this.turnEndedByFoul = false;
         this.potMadeThisTurn = [];
         this.currentBreak = 0;
+        this.collisionLog = [];
         
         // ENDGAME STATE
         this.endgamePhase = false;
@@ -57,17 +57,14 @@ class GameManager {
 
         // BALLS & CUE
         this.balls = [];
-        this.cue = new Cue(null); // Create cue without a ball initially
+        this.cue = new Cue(null);
         this.cueBall = null;
 
-        // --- MODIFIED: Start the game in BALL_IN_HAND state ---
         this.setupBalls();
         this.gameState = 'BALL_IN_HAND';
     }
     
     setupBalls() {
-        // This method now ONLY sets up the object balls (reds and colors).
-        // The cue ball is placed interactively by the player.
         const baulkLineX = this.TABLE_LEFT_X + (this.TABLE_WIDTH / 5);
         const dRadius = this.table.dRadius;
         const tableCenterY = this.TABLE_Y;
@@ -109,9 +106,6 @@ class GameManager {
 
         if (this.gameState === 'BALLS_MOVING' && !this.cue.isShooting) {
             this.checkPockets();
-            for (const ball of this.balls) {
-                if (ball.body.speed > this.MAX_BALL_SPEED) { Matter.Body.setVelocity(ball.body, { x: ball.body.velocity.x / ball.body.speed * this.MAX_BALL_SPEED, y: ball.body.velocity.y / ball.body.speed * this.MAX_BALL_SPEED }); }
-            }
             if (this.cueBall && !this.table.isInPlayingArea(this.cueBall.body.position)) { this.handleCueBallPocketed(); }
             if (areBallsStationary(this.balls)) { this.gameState = 'HANDLING_TURN_END'; }
         } else if (this.gameState === 'HANDLING_TURN_END') {
@@ -130,9 +124,7 @@ class GameManager {
 
     handleInput(eventType) {
         if (eventType === 'mousePressed') {
-            if (this.uiManager.handleInput(mouseX, mouseY)) {
-                return;
-            }
+            if (this.uiManager.handleInput(mouseX, mouseY)) return;
         }
         
         if (this.gameOver) return;
@@ -142,8 +134,12 @@ class GameManager {
             else if (eventType === 'mouseDragged') { this.cue.updateAiming(createVector(mouseX, mouseY)); } 
             else if (eventType === 'mouseReleased') {
                 if (this.cue.aiming) {
-                    this.firstContact = null; this.turnEndedByFoul = false; this.potMadeThisTurn = [];
-                    this.cue.shoot(); this.gameState = 'BALLS_MOVING';
+                    this.firstContact = null; 
+                    this.turnEndedByFoul = false; 
+                    this.potMadeThisTurn = [];
+                    this.collisionLog = [];
+                    this.cue.shoot(); 
+                    this.gameState = 'BALLS_MOVING';
                 }
             }
         } else if (this.gameState === 'BALL_IN_HAND') {
@@ -159,15 +155,34 @@ class GameManager {
     }
     
     handleCollisions(event) {
-        if (this.firstContact) return;
         for (const pair of event.pairs) {
             let otherBody = null;
-            if (this.cueBall && pair.bodyA === this.cueBall.body) { otherBody = pair.bodyB; }
-            else if (this.cueBall && pair.bodyB === this.cueBall.body) { otherBody = pair.bodyA; }
+            if (this.cueBall && pair.bodyA === this.cueBall.body) {
+                otherBody = pair.bodyB;
+            } else if (this.cueBall && pair.bodyB === this.cueBall.body) {
+                otherBody = pair.bodyA;
+            }
+
             if (otherBody) {
-                if (otherBody.label === 'table_boundary') continue;
-                const hitBall = this.balls.find(b => b.body === otherBody);
-                if (hitBall) { this.firstContact = hitBall; break; }
+                let logEntry = null;
+                if (otherBody.label === 'table_boundary') {
+                    logEntry = { type: 'cushion' };
+                    console.log(`Cue Ball Collision: Cushion`);
+                } else {
+                    const hitBall = this.balls.find(b => b.body === otherBody);
+                    if (hitBall) {
+                        if (!this.firstContact) {
+                            this.firstContact = hitBall;
+                        }
+                        // --- MODIFIED: Log an object with color data ---
+                        logEntry = { type: 'ball', color: hitBall.color };
+                        console.log(`Cue Ball Collision: ${hitBall.colorName || 'Red'}`);
+                    }
+                }
+                
+                if (logEntry) {
+                    this.collisionLog.push(logEntry);
+                }
             }
         }
     }
@@ -223,7 +238,6 @@ class GameManager {
     checkLegalPots() {
         let legalPotMade = false;
         if (this.potMadeThisTurn.length === 0) return false;
-        const isColorNominated = this.colorSequence.includes(this.ballOn);
         const pottedRed = this.potMadeThisTurn.find(b => b.type === 'red');
 
         if (!this.turnEndedByFoul) {
@@ -239,7 +253,7 @@ class GameManager {
                 if (this.endgameColorIndex < this.colorSequence.length) { this.ballOn = this.colorSequence[this.endgameColorIndex]; }
                 else { this.gameOver = true; }
             } else if (this.potMadeThisTurn.length > 0) { this.commitFoul(`Potted wrong color in endgame`, 4); }
-        } else if (isColorNominated) {
+        } else if (this.colorSequence.includes(this.ballOn)) {
             const pottedNominatedColor = this.potMadeThisTurn.find(b => b.colorName === this.ballOn);
             if (pottedNominatedColor) { legalPotMade = true; this.ballOn = 'red'; }
             if (pottedRed) { this.commitFoul(`Potted a red when a color was on`, 4); }
@@ -270,12 +284,9 @@ class GameManager {
                         this.handleCueBallPocketed();
                     } else {
                         this.uiManager.addPocketAnimation(ball);
-                        Matter.Body.setVelocity(ball.body, { x: 0, y: 0 });
                         this.potMadeThisTurn.push(ball); 
                         ball.remove();
-                        if (ball.type === 'color' && !this.endgamePhase) {
-                            this.pottedColorsToRespot.push(ball);
-                        }
+                        if (ball.type === 'color' && !this.endgamePhase) this.pottedColorsToRespot.push(ball);
                         this.balls.splice(i, 1);
                     }
                     break; 
@@ -288,11 +299,7 @@ class GameManager {
         if (this.cueBallNeedsRespotted) return;
         this.commitFoul('Cue ball potted', 4);
         this.cueBallNeedsRespotted = true;
-        if (this.cueBall) { Matter.Body.setVelocity(this.cueBall.body, { x: 0, y: 0 }); }
-        const cueBallIndex = this.balls.findIndex(b => b.type === 'cue');
-        if (cueBallIndex !== -1) {
-            this.balls[cueBallIndex].remove(); this.balls.splice(cueBallIndex, 1);
-        }
+        if (this.cueBall) { this.cueBall.remove(); }
         this.cueBall = null;
     }
 
@@ -328,8 +335,8 @@ class GameManager {
         for (let ball of this.pottedColorsToRespot) {
             let spot = this.findAvailableSpot(ball);
             ball.resetPosition(spot.x, spot.y);
-            Matter.World.add(this.world, ball.body);
             this.balls.push(ball);
+            Matter.World.add(this.world, ball.body);
         }
         this.pottedColorsToRespot = [];
     }
@@ -339,7 +346,8 @@ class GameManager {
         if (!this.table.isSpotOccupied(ownSpot, this.balls)) {
             return ownSpot;
         }
-        for (const colorName in this.table.spots) {
+        const spotPriority = ['black', 'pink', 'blue', 'brown', 'green', 'yellow'];
+        for (const colorName of spotPriority) {
             const spotPosition = this.table.spots[colorName];
             if (!this.table.isSpotOccupied(spotPosition, this.balls)) {
                 return spotPosition;
@@ -351,6 +359,7 @@ class GameManager {
     switchPlayer() {
         this.currentPlayer = 1 - this.currentPlayer;
         this.currentBreak = 0;
+        this.collisionLog = [];
         if (!this.endgamePhase) { this.ballOn = 'red'; }
         else { this.ballOn = this.colorSequence[this.endgameColorIndex]; }
     }
@@ -365,7 +374,7 @@ class GameManager {
             return redsLeft * 8 + 27;
         }
         return this.balls.reduce((sum, ball) => {
-            if (ball.type !== 'cue') { return sum + ball.value; }
+            if (ball.type === 'color') { return sum + ball.value; }
             return sum;
         }, 0);
     }
@@ -375,6 +384,7 @@ class GameManager {
         this.balls = []; 
         this.pottedColorsToRespot = []; 
         this.potMadeThisTurn = [];
+        this.collisionLog = [];
         
         this.setupBalls();
 
