@@ -1,6 +1,7 @@
 // src/GameManager.js
 /**
- * This version disables game input and the cue during replays.
+ * This version adds state management for the Aim Assist feature
+ * and ensures it resets correctly between turns.
  */
 class GameManager {
     constructor() {
@@ -14,6 +15,9 @@ class GameManager {
         const runner = Matter.Runner.create();
         Matter.Runner.run(runner, this.engine);
         
+        // This setup assumes ReplayManager.js is loaded, as implemented in previous steps
+        this.replayManager = new ReplayManager(this);
+
         Matter.Events.on(this.engine, 'collisionStart', (event) => { this.handleCollisions(event); });
         Matter.Events.on(this.engine, 'afterUpdate', () => {
             if (this.replayManager) {
@@ -26,7 +30,6 @@ class GameManager {
         this.table = new Table();
         this.scoring = new Scoring();
         this.uiManager = new UIManager(this);
-        this.replayManager = new ReplayManager(this);
 
         // CONSTANTS
         this.TABLE_WIDTH = this.table.width;
@@ -44,6 +47,8 @@ class GameManager {
         this.ghostCueBall = { x: 0, y: 0, isValid: false };
         this.cue = new Cue(null);
         
+        this.aimAssistEnabled = false;
+
         this.startNewMode(1);
     }
     
@@ -203,22 +208,19 @@ class GameManager {
             this.table.draw();
             for (let ball of this.balls) ball.show();
             this.replayManager.drawGhost();
-            // The cue is only drawn when not in replay mode.
             this.cue.draw();
+            this.cue.drawAimTracer(this);
         }
-
         this.uiManager.draw();
     }
-
+    
     // --- INPUT AND STATE HANDLING ---
     
     handleInput(eventType) {
-        // First, allow the UI to handle its own input (e.g., for replay buttons).
         if (eventType === 'mousePressed' && this.uiManager.handleInput(mouseX, mouseY)) {
             return;
         }
 
-        // --- MODIFIED: Block all game-related input if a replay is active. ---
         if (this.replayManager.state === 'REPLAYING') {
             return;
         }
@@ -366,6 +368,10 @@ class GameManager {
     
     // --- UTILITY METHODS ---
 
+    toggleAimAssist() {
+        this.aimAssistEnabled = !this.aimAssistEnabled;
+    }
+
     checkPockets() {
         for (let i = this.balls.length - 1; i >= 0; i--) {
             let ball = this.balls[i];
@@ -457,6 +463,8 @@ class GameManager {
         this.currentPlayer = 1 - this.currentPlayer;
         this.currentBreak = 0;
         this.collisionLog = [];
+        // --- FIXED: Turn off aim assist when the turn switches ---
+        this.aimAssistEnabled = false; 
         if (!this.endgamePhase) { this.ballOn = 'red'; }
         else { this.ballOn = this.colorSequence[this.endgameColorIndex]; }
     }
@@ -500,5 +508,7 @@ class GameManager {
         this.endgamePhase = false; 
         this.endgameColorIndex = 0;
         this.currentBreak = 0;
+        // --- FIXED: Turn off aim assist when the game resets ---
+        this.aimAssistEnabled = false; 
     }
 }

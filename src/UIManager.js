@@ -1,6 +1,6 @@
 // src/UIManager.js
 /**
- * This version refines the replay UI with a looping replay, a stop button, and a renamed ghost button.
+ * This version includes all UI elements and fixes for button visibility and layout.
  */
 class UIManager {
     constructor(gameManager) {
@@ -13,13 +13,14 @@ class UIManager {
         this.saveGhostButton = null;
         this.clearGhostButton = null;
         this.slowMoButton = null;
-        // --- NEW: Stop button for replay overlay ---
         this.stopReplayButton = null;
+        this.aimAssistButton = null;
 
         // Create all UI elements
         this.createNominationButtons();
         this.createModeButtons();
-        this.createReplayButtons();
+        // This single function now creates all extension-related buttons
+        this.createExtensionButtons();
         
         // Animation properties
         this.pocketAnimations = [];
@@ -59,54 +60,23 @@ class UIManager {
         ];
     }
 
-    createReplayButtons() {
+    // This consolidated function creates all extension buttons
+    createExtensionButtons() {
         const buttonWidth = 200;
         const buttonHeight = 40;
         const spacing = 10;
         const startX = this.modeButtons[0].x - buttonWidth - spacing; 
 
-        this.replayButton = {
-            x: startX,
-            y: this.modeButtons[0].y,
-            width: buttonWidth,
-            height: buttonHeight,
-            label: 'Instant Replay'
-        };
+        this.replayButton = { x: startX, y: this.modeButtons[0].y, width: buttonWidth, height: buttonHeight, label: 'Instant Replay' };
+        this.saveGhostButton = { x: startX, y: this.modeButtons[1].y, width: buttonWidth, height: buttonHeight, label: 'Ghost Replay' };
+        this.clearGhostButton = { x: startX, y: this.modeButtons[2].y, width: buttonWidth, height: buttonHeight, label: 'Clear Ghost' };
         
-        this.saveGhostButton = {
-            x: startX,
-            y: this.modeButtons[1].y,
-            width: buttonWidth,
-            height: buttonHeight,
-            // --- MODIFIED: Renamed button ---
-            label: 'Ghost Replay'
-        };
-
-        this.clearGhostButton = {
-            x: startX,
-            y: this.modeButtons[2].y,
-            width: buttonWidth,
-            height: buttonHeight,
-            label: 'Clear Ghost'
-        };
-
-        this.slowMoButton = {
-            x: width / 2 - 100,
-            y: 100,
-            width: 200,
-            height: 40,
-            label: 'Toggle Slow-Mo'
-        };
-
-        // --- NEW: Define the stop button for the replay overlay ---
-        this.stopReplayButton = {
-            x: width / 2 - 100,
-            y: this.slowMoButton.y + buttonHeight + spacing, // Position below slow-mo button
-            width: 200,
-            height: 40,
-            label: 'Stop Replay'
-        };
+        this.slowMoButton = { x: width / 2 - 100, y: 100, width: 200, height: 40, label: 'Toggle Slow-Mo' };
+        this.stopReplayButton = { x: width / 2 - 100, y: this.slowMoButton.y + buttonHeight + spacing, width: 200, height: 40, label: 'Stop Replay' };
+        
+        this.aimAssistButton = { x: 30, y: 160, width: 250, height: 40 };
     }
+
 
     /**
      * Main draw call for the entire UI.
@@ -117,7 +87,8 @@ class UIManager {
         this.drawCollisionLog();
         this.drawModeButtons();
         this.drawInfoPanel();
-        this.drawReplayUI();
+        this.drawReplayUI(); // Handles replay buttons
+        this.drawAimAssistButton();
 
         if (this.gameManager.gameState === 'BALL_IN_HAND') {
             this.drawBallInHandUI();
@@ -190,16 +161,17 @@ class UIManager {
         if (this.gameManager.collisionLog.length === 0) return;
         push();
         const startX = 30;
-        const yPos = 30 + 30 + 35; 
+        const yPos = 125;
         const iconSize = 14;
         const iconSpacing = 5;
 
         fill(255, 255, 255, 200);
-        textSize(14);
+        // --- FIXED: Matched font size to scoreboard ---
+        textSize(22);
         textAlign(LEFT, CENTER);
         text("Collisions:", startX, yPos);
 
-        let currentX = startX + 85;
+        let currentX = startX + 125; // Adjusted offset for larger font
 
         for (const entry of this.gameManager.collisionLog) {
             if (entry.type === 'ball') {
@@ -215,6 +187,31 @@ class UIManager {
             }
             currentX += iconSize + iconSpacing;
         }
+        pop();
+    }
+    
+    drawAimAssistButton() {
+        push();
+        const btn = this.aimAssistButton;
+        const isEnabled = this.gameManager.aimAssistEnabled;
+
+        if (isEnabled) {
+            fill(28, 117, 31, 200);
+        } else {
+            fill(161, 32, 32, 200);
+        }
+        
+        stroke(255, 150);
+        strokeWeight(1);
+        rectMode(CORNER);
+        rect(btn.x, btn.y, btn.width, btn.height, 5);
+
+        const label = `Aim Assist: ${isEnabled ? 'ON' : 'OFF'}`;
+        fill(255);
+        noStroke();
+        textSize(18);
+        textAlign(CENTER, CENTER);
+        text(label, btn.x + btn.width / 2, btn.y + btn.height / 2);
         pop();
     }
 
@@ -338,9 +335,9 @@ class UIManager {
 
         push();
         rectMode(CORNER);
-        textAlign(CENTER, CENTER);
-
+        
         const drawStyledButton = (btn, highlight = false) => {
+            if (!btn) return;
             if (highlight) {
                 fill(135, 206, 250, 220);
                 stroke(255);
@@ -354,17 +351,20 @@ class UIManager {
             
             fill(0);
             noStroke();
+            // --- FIXED: Explicitly set text alignment to guarantee centering ---
+            textAlign(CENTER, CENTER);
             textSize(16);
             text(btn.label, btn.x + btn.width / 2, btn.y + btn.height / 2);
         };
         
-        if (replayManager.state === 'IDLE' && replayManager.replayData.length > 0) {
-            drawStyledButton(this.replayButton);
-            drawStyledButton(this.saveGhostButton);
-        }
-
-        if (replayManager.ghostData) {
-            drawStyledButton(this.clearGhostButton);
+        if (replayManager.state === 'IDLE') {
+            if (replayManager.replayData.length > 0) {
+                drawStyledButton(this.replayButton);
+                drawStyledButton(this.saveGhostButton);
+            }
+            if (replayManager.ghostData) {
+                drawStyledButton(this.clearGhostButton);
+            }
         }
 
         if (replayManager.state === 'REPLAYING') {
@@ -373,15 +373,14 @@ class UIManager {
             rect(0, 0, width, height);
             
             fill(255);
-            textSize(32);
             textAlign(CENTER, TOP);
+            textSize(32);
             text('REPLAY MODE', width / 2, 20);
             
             textSize(18);
             text('Press SPACE to exit', width / 2, 60);
             
             drawStyledButton(this.slowMoButton, replayManager.isSlowMotion);
-            // --- NEW: Draw the stop button on the overlay ---
             drawStyledButton(this.stopReplayButton);
         }
         pop();
@@ -396,8 +395,8 @@ class UIManager {
         const score2 = this.gameManager.scoring.getScore(1);
         const winner = score1 > score2 ? 'Player 1 Wins!' : 'Player 2 Wins!';
         fill(255);
-        textSize(36);
         textAlign(CENTER, CENTER);
+        textSize(36);
         text('Frame Over', width / 2, height / 2 - 40);
         textSize(28);
         text(winner, width / 2, height / 2 + 10);
@@ -406,6 +405,12 @@ class UIManager {
     
     handleInput(mx, my) {
         const replayManager = this.gameManager.replayManager;
+
+        const assistBtn = this.aimAssistButton;
+        if (mx > assistBtn.x && mx < assistBtn.x + assistBtn.width && my > assistBtn.y && my < assistBtn.y + assistBtn.height) {
+            this.gameManager.toggleAimAssist();
+            return true;
+        }
         
         if (replayManager && replayManager.state === 'REPLAYING') {
             const slowMoBtn = this.slowMoButton;
@@ -413,7 +418,6 @@ class UIManager {
                 replayManager.toggleSlowMotion();
                 return true;
             }
-            // --- NEW: Handle input for the stop button ---
             const stopBtn = this.stopReplayButton;
             if (mx > stopBtn.x && mx < stopBtn.x + stopBtn.width && my > stopBtn.y && my < stopBtn.y + stopBtn.height) {
                 replayManager.stopReplay();
@@ -428,14 +432,12 @@ class UIManager {
                     replayManager.startReplay();
                     return true;
                 }
-                
                 const saveBtn = this.saveGhostButton;
                 if (mx > saveBtn.x && mx < saveBtn.x + saveBtn.width && my > saveBtn.y && my < saveBtn.y + saveBtn.height) {
                     replayManager.saveAsGhost();
                     return true;
                 }
             }
-            
             if (replayManager.ghostData) {
                 const clearBtn = this.clearGhostButton;
                 if (mx > clearBtn.x && mx < clearBtn.x + clearBtn.width && my > clearBtn.y && my < clearBtn.y + clearBtn.height) {
@@ -478,7 +480,7 @@ class UIManager {
         if (playerIndex === 0) {
             this.p1ScoreAnim = 12;
         } else {
-            this.p2ScoreAnim = 12;
+            this.p1ScoreAnim = 12;
         }
     }
 }

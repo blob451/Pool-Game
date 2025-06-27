@@ -1,7 +1,7 @@
 // src/Cue.js
 /**
  * Handles cue aiming, visual feedback, and shooting logic.
- * This version includes a realistic cue stick, a dynamic power bar, and a striking animation.
+ * This version includes the Aim Assist tracer line and a restored cue design.
  */
 class Cue {
     constructor(cueBall) {
@@ -11,7 +11,7 @@ class Cue {
         this.end = null;
         
         this.maxPowerDist = 150;
-        this.powerScale = 0.0005; // Reverted to original power scale as requested
+        this.powerScale = 0.0005;
 
         this.cueLength = 380;
         this.cueButtWidth = 14;
@@ -19,15 +19,16 @@ class Cue {
         this.cueTipWidth = 7;
         this.cuePullback = 10;
 
+        this.railColor = color(116, 87, 48);
+
         this.powerColorLow = color(67, 160, 71);
         this.powerColorMid = color(253, 216, 53);
         this.powerColorHigh = color(211, 47, 47);
 
-        // --- NEW: Animation state ---
         this.isShooting = false;
         this.shootAnimation = {
             progress: 0,
-            duration: 8, // Animation duration in frames
+            duration: 8,
             finalPower: 0,
             finalAngle: 0,
             initialPullback: 0
@@ -35,82 +36,102 @@ class Cue {
     }
 
     startAiming(mousePos) {
-        if (this.isShooting) return;
+        if (!this.cueBall) return;
         this.aiming = true;
-        this.start = mousePos.copy();
-        this.end = mousePos.copy();
+        this.start = mousePos;
+        this.end = mousePos;
     }
 
     updateAiming(mousePos) {
-        if (this.aiming) {
-            this.end = mousePos.copy();
-        }
+        if (!this.aiming) return;
+        this.end = mousePos;
     }
 
     shoot() {
-        if (!this.aiming || !this.cueBall || !this.cueBall.body) return;
+        if (!this.aiming) return;
+        
+        const forceVector = p5.Vector.sub(this.start, this.end);
+        const distance = clamp(forceVector.mag(), 0, this.maxPowerDist);
+        const power = distance * this.powerScale;
 
-        // --- MODIFIED: Trigger animation instead of applying force directly ---
-        const dragVec = p5.Vector.sub(this.start, this.end);
-        const power = constrain(dragVec.mag(), 0, this.maxPowerDist);
-        
-        this.shootAnimation.finalPower = power * this.powerScale;
-        this.shootAnimation.finalAngle = dragVec.heading();
-        this.shootAnimation.initialPullback = map(power, 0, this.maxPowerDist, 0, this.maxPowerDist * 0.6);
-        this.shootAnimation.progress = 0;
-        
+        this.shootAnimation.finalPower = power;
+        this.shootAnimation.finalAngle = forceVector.heading();
+        this.shootAnimation.initialPullback = distance;
         this.isShooting = true;
-        this.aiming = false; // Stop aiming visuals
+        this.aiming = false;
     }
 
     draw() {
+        if (!this.cueBall) return;
+        push();
+
         if (this.isShooting) {
-            this.drawShotAnimation();
-        } else if (this.aiming && this.start && this.end && this.cueBall && this.cueBall.body) {
-            this.drawAimingVisuals();
+            this.animateShot();
+        } else if (this.aiming) {
+            this.drawAimingCue();
         }
-    }
 
-    drawAimingVisuals() {
-        const cueBallPos = createVector(this.cueBall.body.position.x, this.cueBall.body.position.y);
-        const dragVec = p5.Vector.sub(this.start, this.end);
-        const angle = dragVec.heading();
-        const power = constrain(dragVec.mag(), 0, this.maxPowerDist);
-        const powerPercent = power / this.maxPowerDist;
-        const pullBack = map(power, 0, this.maxPowerDist, 0, this.maxPowerDist * 0.6);
-
-        this.drawCue(angle, pullBack);
-        this.drawPowerBar(angle, powerPercent, pullBack);
-        this.drawAimingGuideLine(cueBallPos);
+        pop();
     }
     
-    drawShotAnimation() {
-        this.shootAnimation.progress++;
-        
-        const t = this.shootAnimation.progress / this.shootAnimation.duration;
-        // Ease-out quint function for a sharp, fast strike
-        const easedT = 1 - Math.pow(1 - t, 5); 
-        
-        const lunge = this.shootAnimation.initialPullback * easedT;
-        const currentPullback = this.shootAnimation.initialPullback - lunge;
-        
-        this.drawCue(this.shootAnimation.finalAngle, currentPullback);
-        
-        if (this.shootAnimation.progress >= this.shootAnimation.duration) {
-            const forceVector = p5.Vector.fromAngle(this.shootAnimation.finalAngle).setMag(this.shootAnimation.finalPower);
-            Matter.Body.applyForce(this.cueBall.body, this.cueBall.body.position, { x: forceVector.x, y: forceVector.y });
-            
-            this.isShooting = false; // End animation
+    drawAimTracer(gameManager) {
+        if (!gameManager.aimAssistEnabled || !this.aiming || !this.cueBall) {
+            return;
         }
+
+        push();
+        const direction = p5.Vector.sub(this.start, this.end).normalize();
+        const startPoint = createVector(this.cueBall.body.position.x, this.cueBall.body.position.y);
+        const endPoint = p5.Vector.add(startPoint, p5.Vector.mult(direction, 3000));
+
+        stroke(255, 255, 255, 150);
+        strokeWeight(2);
+        line(startPoint.x, startPoint.y, endPoint.x, endPoint.y);
+        pop();
     }
 
-    drawCue(angle, pullBack) {
-        push();
+    animateShot() {
+        this.shootAnimation.progress++;
+        let animProgress = this.shootAnimation.progress / this.shootAnimation.duration;
+        let easedProgress = (1 - Math.cos(animProgress * PI)) / 2;
+        
+        const currentPullback = lerp(this.shootAnimation.initialPullback, -this.cuePullback * 4, easedProgress);
+        
+        translate(this.cueBall.body.position.x, this.cueBall.body.position.y);
+        rotate(this.shootAnimation.finalAngle);
+        
+        this._drawCueStick(currentPullback);
+        
+        if (this.shootAnimation.progress >= this.shootAnimation.duration) {
+            const force = this.shootAnimation.finalPower;
+            const angle = this.shootAnimation.finalAngle;
+            Matter.Body.applyForce(this.cueBall.body, this.cueBall.body.position, {
+                x: Math.cos(angle) * force,
+                y: Math.sin(angle) * force
+            });
+            this.isShooting = false;
+            this.shootAnimation.progress = 0;
+        }
+    }
+    
+    drawAimingCue() {
+        const forceVector = p5.Vector.sub(this.start, this.end);
+        const distance = clamp(forceVector.mag(), 0, this.maxPowerDist);
+        const angle = forceVector.heading();
+
         translate(this.cueBall.body.position.x, this.cueBall.body.position.y);
         rotate(angle);
-
+        
+        this._drawCueStick(distance);
+        this._drawPowerBar(distance);
+    }
+    
+    _drawCueStick(pullBack) {
         const cueStart = -this.cuePullback - pullBack;
-        const jointPosition = cueStart - this.cueLength * 0.75;
+        // The original butt was ~45% of the cue length. 2/5 of that is ~18%.
+        // The joint position is the coordinate where the butt ends.
+        // A higher multiplier means a shorter butt. (1 - 0.18) = 0.82
+        const jointPosition = cueStart - this.cueLength * (1 - (0.45 * 2/5)); // Corrected calculation
 
         // Shadow
         stroke(10, 5, 0, 90);
@@ -144,14 +165,10 @@ class Cue {
         stroke(60, 90, 110);
         strokeWeight(this.cueTipWidth);
         point(cueStart, 0);
-
-        pop();
     }
-
-    drawPowerBar(angle, powerPercent, pullBack) {
-        push();
-        translate(this.cueBall.body.position.x, this.cueBall.body.position.y);
-        rotate(angle);
+    
+    _drawPowerBar(pullBack) {
+        const powerPercent = pullBack / this.maxPowerDist;
         
         const cueStart = -this.cuePullback - pullBack;
         const powerBarYOffset = 35;
@@ -159,12 +176,10 @@ class Cue {
         const powerBarHeight = 10;
         const powerBarX = cueStart - this.cueLength;
 
-        // Background
         noStroke();
         fill(0, 0, 0, 120);
         rect(powerBarX, powerBarYOffset, powerBarLength, powerBarHeight, 5);
         
-        // Fill
         let currentPowerColor;
         if (powerPercent <= 0.5) {
             let amount = powerPercent * 2;
@@ -177,23 +192,10 @@ class Cue {
         fill(currentPowerColor);
         rect(powerBarX, powerBarYOffset, powerBarLength * powerPercent, powerBarHeight, 5);
         
-        // Text
         noStroke();
         fill(255, 220);
         textSize(12);
         textAlign(LEFT, CENTER);
         text(`${(powerPercent * 100).toFixed(0)}%`, powerBarX + powerBarLength + 10, powerBarYOffset + powerBarHeight / 2);
-
-        pop();
-    }
-
-    drawAimingGuideLine(cueBallPos) {
-        push();
-        stroke(255, 255, 255, 100);
-        strokeWeight(1);
-        drawingContext.setLineDash([3, 5]);
-        line(cueBallPos.x, cueBallPos.y, this.end.x, this.end.y);
-        drawingContext.setLineDash([]);
-        pop();
     }
 }
