@@ -127,7 +127,7 @@ class UIManager {
         const lineHeight = 30;
 
         fill(255);
-        textSize(22 + this.p1ScoreAnim);
+        textSize(22);
         textAlign(LEFT, TOP);
         text('Player 1', startX, startY);
         text(p1, startX + 150, startY);
@@ -137,7 +137,7 @@ class UIManager {
         }
 
         fill(255);
-        textSize(22 + this.p2ScoreAnim);
+        textSize(22);
         text('Player 2', startX, startY + lineHeight);
         text(p2, startX + 150, startY + lineHeight);
         if (this.gameManager.currentPlayer === 1) {
@@ -150,10 +150,6 @@ class UIManager {
             textSize(20);
             text(`Break: ${this.gameManager.currentBreak}`, startX, startY + lineHeight * 2.5);
         }
-
-        this.p1ScoreAnim *= 0.9;
-        this.p2ScoreAnim *= 0.9;
-        
         pop();
     }
 
@@ -480,7 +476,7 @@ class UIManager {
         if (playerIndex === 0) {
             this.p1ScoreAnim = 12;
         } else {
-            this.p1ScoreAnim = 12;
+            this.p2ScoreAnim = 12;
         }
     }
 }
