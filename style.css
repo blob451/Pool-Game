@@ -1,21 +1,24 @@
-/* style.css - No centering, no margin, p5 canvas fills window at top-left. */
+/* style.css - Defines the visual presentation for the snooker game application. */
 
+/* Establishes the foundational styles for the entire webpage. */
 body {
-    margin: 0;
-    padding: 0;
-    background: #222; /* dark outer background */
-    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0; 
+    padding: 0; 
+    background: #222; 
+    font-family: 'Segoe UI', Arial, sans-serif; 
 }
 
+/* Styles the main containers to ensure the canvas displays correctly. */
 main, #game-container, canvas {
-    display: block;
-    margin: 0;
-    padding: 0;
-    box-shadow: none;
+    display: block; /* Ensures elements are rendered as block-level for proper layout. */
+    margin: 0; 
+    padding: 0; 
+    box-shadow: none; 
     border-radius: 0;
     background: none;
 }
 
+/* Hides the main heading element. */
 h1 {
-    display: none; /* Hide title if using p5 only */
+    display: none; /* Removes the h1 element from the layout, as the canvas handles the visual presentation. */
 }

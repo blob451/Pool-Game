@@ -1,12 +1,16 @@
 // src/UIManager.js
 /**
- * This version includes all UI elements and fixes for button visibility and layout.
+ * Manages the creation, rendering, and user interaction for all User Interface (UI) elements.
  */
 class UIManager {
+    /**
+     * Initializes the UI manager and creates all interface elements.
+     * @param {GameManager} gameManager - The central game manager instance.
+     */
     constructor(gameManager) {
         this.gameManager = gameManager;
 
-        // UI element properties
+        // Initializes properties for storing UI button data.
         this.nominationButtons = [];
         this.modeButtons = [];
         this.replayButton = null;
@@ -16,18 +20,20 @@ class UIManager {
         this.stopReplayButton = null;
         this.aimAssistButton = null;
 
-        // Create all UI elements
+        // Calls methods to create all UI elements.
         this.createNominationButtons();
         this.createModeButtons();
-        // This single function now creates all extension-related buttons
         this.createExtensionButtons();
         
-        // Animation properties
+        // Initializes properties for UI animations.
         this.pocketAnimations = [];
         this.p1ScoreAnim = 0;
         this.p2ScoreAnim = 0;
     }
 
+    /**
+     * Defines the properties and positions for the colour nomination buttons.
+     */
     createNominationButtons() {
         const colorSequence = ['yellow', 'green', 'brown', 'blue', 'pink', 'black'];
         const buttonWidth = 100;
@@ -46,6 +52,9 @@ class UIManager {
         }));
     }
 
+    /**
+     * Defines the properties and positions for the game mode selection buttons.
+     */
     createModeButtons() {
         const buttonWidth = 200;
         const buttonHeight = 40;
@@ -60,7 +69,9 @@ class UIManager {
         ];
     }
 
-    // This consolidated function creates all extension buttons
+    /**
+     * Defines the properties and positions for all extension-related buttons.
+     */
     createExtensionButtons() {
         const buttonWidth = 200;
         const buttonHeight = 40;
@@ -79,7 +90,7 @@ class UIManager {
 
 
     /**
-     * Main draw call for the entire UI.
+     * Main rendering function for the entire UI, called every frame.
      */
     draw() {
         this.drawPocketAnimations();
@@ -87,7 +98,7 @@ class UIManager {
         this.drawCollisionLog();
         this.drawModeButtons();
         this.drawInfoPanel();
-        this.drawReplayUI(); // Handles replay buttons
+        this.drawReplayUI();
         this.drawAimAssistButton();
 
         if (this.gameManager.gameState === 'BALL_IN_HAND') {
@@ -99,6 +110,9 @@ class UIManager {
         }
     }
     
+    /**
+     * Renders and animates a visual effect when a ball is pocketed.
+     */
     drawPocketAnimations() {
         push();
         for (let i = this.pocketAnimations.length - 1; i >= 0; i--) {
@@ -108,9 +122,11 @@ class UIManager {
             noStroke();
             ellipse(anim.x, anim.y, anim.radius * 2);
 
+            // Fades and shrinks the animation over time.
             anim.radius *= 0.95;
             anim.alpha -= 10;
 
+            // Removes the animation once it is no longer visible.
             if (anim.alpha <= 0) {
                 this.pocketAnimations.splice(i, 1);
             }
@@ -118,6 +134,9 @@ class UIManager {
         pop();
     }
     
+    /**
+     * Renders the scoreboard, including player scores, the current break, and the active player indicator.
+     */
     drawScoreboard() {
         push();
         const p1 = this.gameManager.scoring.getScore(0);
@@ -153,6 +172,9 @@ class UIManager {
         pop();
     }
 
+    /**
+     * Renders a visual log of the cue ball's collisions during a turn.
+     */
     drawCollisionLog() {
         if (this.gameManager.collisionLog.length === 0) return;
         push();
@@ -162,13 +184,13 @@ class UIManager {
         const iconSpacing = 5;
 
         fill(255, 255, 255, 200);
-        // --- FIXED: Matched font size to scoreboard ---
         textSize(22);
         textAlign(LEFT, CENTER);
         text("Collisions:", startX, yPos);
 
-        let currentX = startX + 125; // Adjusted offset for larger font
+        let currentX = startX + 125;
 
+        // Draws an icon for each collision event.
         for (const entry of this.gameManager.collisionLog) {
             if (entry.type === 'ball') {
                 fill(entry.color);
@@ -186,11 +208,15 @@ class UIManager {
         pop();
     }
     
+    /**
+     * Renders the button for toggling the aim assist feature.
+     */
     drawAimAssistButton() {
         push();
         const btn = this.aimAssistButton;
         const isEnabled = this.gameManager.aimAssistEnabled;
 
+        // Changes colour based on whether the feature is enabled.
         if (isEnabled) {
             fill(28, 117, 31, 200);
         } else {
@@ -211,6 +237,9 @@ class UIManager {
         pop();
     }
 
+    /**
+     * Renders a central information panel displaying contextual game state information.
+     */
     drawInfoPanel() {
         push();
         textAlign(CENTER, TOP);
@@ -219,6 +248,7 @@ class UIManager {
         let textColor = color(255);
         let panelAlpha = 0;
 
+        // Determines the text and appearance based on the current game state.
         if (this.gameManager.gameState === 'BALL_IN_HAND') {
             infoText = "Place Cue Ball in the D";
             panelAlpha = 180;
@@ -228,6 +258,7 @@ class UIManager {
             
             const maxTime = 180;
             const fadeDuration = 30;
+            // Manages the fade-in and fade-out animation of the foul message.
             if (this.gameManager.foulMessageTimer > maxTime - fadeDuration) {
                 panelAlpha = map(this.gameManager.foulMessageTimer, maxTime, maxTime - fadeDuration, 0, 180);
             } else if (this.gameManager.foulMessageTimer < fadeDuration) {
@@ -244,6 +275,7 @@ class UIManager {
             panelAlpha = 150;
         }
 
+        // Renders the panel if there is text to display.
         if (infoText) {
             const panelWidth = 450;
             const panelHeight = 40;
@@ -264,10 +296,14 @@ class UIManager {
         pop();
     }
     
+    /**
+     * Renders the UI for 'ball in hand', including the 'D' area and the ghost cue ball.
+     */
     drawBallInHandUI() {
         push();
         noStroke();
         fill(255, 255, 255, 30);
+        // Draws the semi-circular 'D' area.
         arc(
             this.gameManager.table.baulkLineX,
             this.gameManager.table.y,
@@ -277,6 +313,7 @@ class UIManager {
             3 * HALF_PI
         );
 
+        // Renders the translucent cue ball at the mouse position.
         const ghost = this.gameManager.ghostCueBall;
         if (ghost.isValid) {
             fill(255, 255, 255, 150);
@@ -288,6 +325,9 @@ class UIManager {
         pop();
     }
 
+    /**
+     * Renders the colour nomination buttons.
+     */
     drawNominationButtons() {
         push();
         rectMode(CORNER);
@@ -306,6 +346,9 @@ class UIManager {
         pop();
     }
 
+    /**
+     * Renders the game mode selection buttons.
+     */
     drawModeButtons() {
         push();
         rectMode(CORNER);
@@ -325,6 +368,9 @@ class UIManager {
         pop();
     }
 
+    /**
+     * Renders the UI elements related to the replay feature.
+     */
     drawReplayUI() {
         const replayManager = this.gameManager.replayManager;
         if (!replayManager) return;
@@ -332,6 +378,7 @@ class UIManager {
         push();
         rectMode(CORNER);
         
+        // Helper function to draw a styled button.
         const drawStyledButton = (btn, highlight = false) => {
             if (!btn) return;
             if (highlight) {
@@ -347,12 +394,12 @@ class UIManager {
             
             fill(0);
             noStroke();
-            // --- FIXED: Explicitly set text alignment to guarantee centering ---
             textAlign(CENTER, CENTER);
             textSize(16);
             text(btn.label, btn.x + btn.width / 2, btn.y + btn.height / 2);
         };
         
+        // Renders buttons based on the replay manager's state.
         if (replayManager.state === 'IDLE') {
             if (replayManager.replayData.length > 0) {
                 drawStyledButton(this.replayButton);
@@ -382,6 +429,9 @@ class UIManager {
         pop();
     }
     
+    /**
+     * Renders the game over screen with the final result.
+     */
     drawGameOverUI() {
         push();
         rectMode(CENTER);
@@ -399,15 +449,23 @@ class UIManager {
         pop();
     }
     
+    /**
+     * Handles mouse input by checking if any UI buttons were clicked.
+     * @param {number} mx - The x-coordinate of the mouse.
+     * @param {number} my - The y-coordinate of the mouse.
+     * @returns {boolean} True if a UI element was clicked, otherwise false.
+     */
     handleInput(mx, my) {
         const replayManager = this.gameManager.replayManager;
 
+        // Checks for a click on the aim assist button.
         const assistBtn = this.aimAssistButton;
         if (mx > assistBtn.x && mx < assistBtn.x + assistBtn.width && my > assistBtn.y && my < assistBtn.y + assistBtn.height) {
             this.gameManager.toggleAimAssist();
             return true;
         }
         
+        // Checks for clicks on replay-specific buttons.
         if (replayManager && replayManager.state === 'REPLAYING') {
             const slowMoBtn = this.slowMoButton;
             if (mx > slowMoBtn.x && mx < slowMoBtn.x + slowMoBtn.width && my > slowMoBtn.y && my < slowMoBtn.y + slowMoBtn.height) {
@@ -421,6 +479,7 @@ class UIManager {
             }
         }
 
+        // Checks for clicks on replay management buttons when idle.
         if (replayManager && replayManager.state === 'IDLE') {
             if (replayManager.replayData.length > 0) {
                 const replayBtn = this.replayButton;
@@ -443,6 +502,7 @@ class UIManager {
             }
         }
 
+        // Checks for clicks on game mode buttons.
         for (const btn of this.modeButtons) {
             if (mx > btn.x && mx < btn.x + btn.width && my > btn.y && my < btn.y + btn.height) {
                 this.gameManager.startNewMode(btn.mode);
@@ -450,6 +510,7 @@ class UIManager {
             }
         }
 
+        // Checks for clicks on nomination buttons.
         if (this.gameManager.gameState === 'AWAITING_NOMINATION') {
             for (const btn of this.nominationButtons) {
                 if (mx > btn.x && mx < btn.x + btn.width && my > btn.y && my < btn.y + btn.height) {
@@ -462,6 +523,10 @@ class UIManager {
         return false;
     }
 
+    /**
+     * Adds a new pocketing animation to be rendered.
+     * @param {Ball} ball - The ball that was pocketed.
+     */
     addPocketAnimation(ball) {
         this.pocketAnimations.push({
             x: ball.body.position.x,
@@ -472,6 +537,10 @@ class UIManager {
         });
     }
 
+    /**
+     * Triggers a visual animation on the scoreboard for a specific player.
+     * @param {number} playerIndex - The index of the player (0 or 1).
+     */
     triggerScoreAnimation(playerIndex) {
         if (playerIndex === 0) {
             this.p1ScoreAnim = 12;
